@@ -1,0 +1,21 @@
+ckàogit
+
+project/
+├── node_modules/
+├── config/
+│   └── db.js           # File cấu hình MongoDB
+├── controllers/
+│   └── userController.js # Các hàm xử lý logic cho User
+├── models/
+│   └── User.js         # Schema và model cho User
+├── routes/
+│   └── userRoutes.js   # Các endpoint liên quan đến User
+├── middlewares/
+│   └── authMiddleware.js # Middleware xử lý xác thực
+├── utils/
+│   └── logger.js       # Các hàm tiện ích (ví dụ: log)
+├── .env                # Biến môi trường
+├── .gitignore          # Các file/thư mục cần bỏ qua khi push lên Git
+├── index.js            # Điểm khởi đầu của ứng dụng
+├── package.json        # File cấu hình npm
+└── README.md           # Hướng dẫn sử dụng dự án
