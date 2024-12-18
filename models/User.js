@@ -13,7 +13,6 @@ const userSchema = new mongoose.Schema({
         lowercase : true, 
         required: true,
         unique : true, 
-
     },
     password: {
         type: String,
@@ -34,7 +33,7 @@ const userSchema = new mongoose.Schema({
         require : true, 
     },
     userType : {
-        type : "String", 
+        type : String, 
         require : true, 
 
     }, 
