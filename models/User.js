@@ -15,6 +15,10 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    hoTen: {
+        type: String,
+        required: true,
+    },
 });
 
 // Tạo Model
