@@ -6,19 +6,26 @@ const userSchema = new mongoose.Schema({
         type: String, // Loại dữ liệu: String
         required: true, // Bắt buộc phải có
         unique: true, // Đảm bảo UID là duy nhất
+        immutable : true //không cho phép thay đổi trường này
     },
     userName: {
         type: String,
         required: true,
+        unique : true, 
+
     },
     userPassword: {
         type: String,
         required: true,
     },
-    hoTen: {
-        type: String,
-        required: true,
-    },
+    fullName : {
+        type : String, 
+        required : true, 
+
+    }, 
+    dateOfBirth :{ 
+        type : Date, 
+    }
 });
 
 // Tạo Model

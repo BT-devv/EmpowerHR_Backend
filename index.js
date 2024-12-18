@@ -1,6 +1,7 @@
 // Import các thư viện
 const express = require('express');
 
+
 const connectDB = require('./config/db.js')
 require('dotenv').config(); // Để sử dụng biến môi trường từ .env
 const authRoutes = require('./routes/userRoutes.js');
@@ -10,6 +11,7 @@ const app = express();
 connectDB();
 
 
+// Cấu hình Middleware
 app.use(express.json()); // Để parse JSON từ body của request
 app.use('/api/auth', authRoutes);
 // Route cơ bản
@@ -22,3 +24,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🌐 Server đang chạy trên cổng: ${PORT}`);
 });
+
+
+
