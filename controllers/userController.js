@@ -3,10 +3,10 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 const login = async (req, res) => {
-    const { userName, userPassword } = req.body;
+    const { email, password } = req.body;
 
     try {
-        const user = await User.findOne({ userName });
+        const user = await User.findOne({ email });
         if (!user) {
             return res.status(404).json({
                 success: false,
@@ -14,8 +14,11 @@ const login = async (req, res) => {
             });
         }
 
-        const isPasswordValid = await bcrypt.compare(userPassword, user.userPassword);
-        if (!isPasswordValid) {
+        
+        if (password !== user.password) {
+          console.log("Email nè :"+email);
+          console.log("pass nè :"+password);
+          console.log("pass mẫu nè :"+user.password);
             return res.status(401).json({
                 success: false,
                 message: 'Mật khẩu không đúng. Vui lòng thử lại.',
@@ -23,7 +26,7 @@ const login = async (req, res) => {
         }
 
         const token = jwt.sign(
-            { userId: user._id, userName: user.userName },
+            { userId: user._id, email: user.email },
             process.env.JWT_SECRET,
             { expiresIn: '1h' } 
         );

@@ -6,7 +6,7 @@ const User = require('../models/User');
 
 // Định nghĩa route login với middleware validateLoginInput
 router.post('/login', login);
-router.get('/users', async (req, res) => {
+router.get('/Getallusers', async (req, res) => {
     try {
         const users = await User.find(); // Lấy toàn bộ dữ liệu trong bảng users
         if (!users || users.length === 0) {
