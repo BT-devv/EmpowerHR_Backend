@@ -12,7 +12,6 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true,
         unique : true, 
-
     },
     userPassword: {
         type: String,
@@ -29,6 +28,6 @@ const userSchema = new mongoose.Schema({
 });
 
 // Tạo Model
-const User = mongoose.model('User', userSchema);
+const User = mongoose.model('users', userSchema);
 
 module.exports = User;
