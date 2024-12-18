@@ -30,6 +30,14 @@ jobs:
         cache: 'npm'
     - run: npm ci
     
-    - run: |
-        touch .env
+    - name: Create .env file
+      run: |
+        echo "MONGO_URI=${{ secrets.MONGO_URI }}" >> .env
+        echo "PORT=${{ secrets.PORT }}" >> .env
+        echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
         echo "NODE_ENV=${{ secrets.NODE_ENV }}" >> .env
+
+    - name: Display .env content
+      run: |
+        echo "Environment file created:"
+        cat .env
