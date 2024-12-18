@@ -1,21 +1,28 @@
+// Import các thư viện
 const express = require("express");
 const morgan = require("morgan");
+const { connectDB } = require("./config/db.js");
+const authRoutes = require("./routes/userRoutes.js");
+require("dotenv").config(); // Để sử dụng biến môi trường từ .env
 
+// Tạo ứng dụng Express
 const app = express();
-
+// Sử dụng morgan với định dạng 'dev'
 app.use(morgan("dev"));
+//Connect DB
+connectDB();
 
-app.use(express.json());
+// Cấu hình Middleware
+app.use(express.json()); // Để parse JSON từ body của request
 
+app.use("/api/auth", authRoutes);
+// Route cơ bản
 app.get("/", (req, res) => {
-  res.send("Hello, Express.js with Morgan!");
+  res.send("🚀 Server đang chạy!");
 });
 
-app.get("/api", (req, res) => {
-  res.json({ message: "Welcome to the API!" });
-});
-
-const PORT = 3000;
+// Khởi động server
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`🌐 Server running on port: ${PORT}`);
 });
