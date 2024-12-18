@@ -2,35 +2,28 @@ const { connectDB, seedData } = require("./config/db");
 const User = require("./models/User"); // Đường dẫn tới file model User
 
 // Dữ liệu mẫu
-const userData = [
-  {
-    userID: "U001",
-    userName: "john_doe",
-    userPassword: "password123", // Trong thực tế, cần hash mật khẩu
-    fullName: "John Doe",
-    dateOfBirth: "1990-01-01",
-  },
-  {
-    userID: "U002",
-    userName: "jane_doe",
-    userPassword: "password456",
-    fullName: "Jane Doe",
-    dateOfBirth: "1995-05-15",
-  },
-  {
-    userID: "U003",
-    userName: "mike_smith",
-    userPassword: "password789",
-    fullName: "Mike Smith",
-    dateOfBirth: "1988-10-30",
-  },
-];
+const user = new User({
+  userID: "U001",
+  email: "admin@gmail.com",
+  password: "password123", // Sẽ được hash
+  firstName: "Admin",
+  lastName: "Admin",
+  dateOfBirth: "1990-01-01",
+  gender: 0,
+  userType: "admin",
+  expertise: "Software Engineering",
+  address: "123 Main Street",
+  province: "Hanoi",
+  postcode: 100000,
+  status: 1,
+});
 
 // Hàm chạy seed
 const runSeed = async () => {
   try {
     await connectDB(); // Kết nối database
-    await seedData(User, userData); // Gọi hàm seedData
+    await user.save(); // Middleware `pre("save")` sẽ chạy tại đây
+    await seedData(User, user); // Gọi hàm seedData
     console.log("Seeding completed!");
     process.exit(); // Thoát sau khi hoàn tất
   } catch (err) {
