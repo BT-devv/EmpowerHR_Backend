@@ -8,26 +8,66 @@ const userSchema = new mongoose.Schema({
         unique: true, // Đảm bảo UID là duy nhất
         immutable : true //không cho phép thay đổi trường này
     },
-    userName: {
+    email: {
         type: String,
+        lowercase : true, 
         required: true,
         unique : true, 
     },
-    userPassword: {
+    password: {
         type: String,
         required: true,
     },
-    fullName : {
+    firstName : {
         type : String, 
         required : true, 
-
+    }, 
+    lastName : {
+        type : String, 
     }, 
     dateOfBirth :{ 
+        type : Date, //date là yyyy-mm-dd
+    }, 
+    gender : {  //0-Male 1-Female
+        type : Boolean, 
+        require : true, 
+    },
+    userType : {
+        type : "String", 
+        require : true, 
+
+    }, 
+    expertise : {   //chuyên môn
+        type : String, 
+        require : true,
+    }, 
+    address : {
+        type : String, 
+        require : true,
+    }, 
+    province : {
+        type : String, 
+        require : true
+    }, 
+    postcode : {
+        type : Number, 
+        require : true, 
+        default : 700000
+    }, 
+    status : {  //boolean 1-active 0-inactive
+        type : Boolean, 
+        require : true,
+        default : 1
+    }, 
+    createAt : {
+        immutable : true, //khong cho phep thay doi truong nay
         type : Date, 
-    }
+        default : () => Date.now() //tao ngay mac dinh la hom nay //tao ngay moi neu user chua co ngay
+    },updateAt : {
+        type : Date, 
+        default : () => Date.now() //tao ngay mac dinh la hom nay //tao ngay moi neu user chua co ngay
+    },
 });
 
 // Tạo Model
-const User = mongoose.model('users', userSchema);
-
-module.exports = User;
+module.exports  = mongoose.model('User', userSchema);
