@@ -8,11 +8,17 @@ taoUser()
 function taoUser(){
     try {
         const user =  User.create({
-            userID : "0001", 
-            userName : "tuanbuiHR123", 
-            userPassword : "lamviecdimaythangnhoc", 
-            fullName : "Bùi Trung Tuấn", 
-            dateOfBirth : 62, 
+            userID : "mkt_001001", 
+            email : "toidaidot@HREmPowerEd.com",
+            firstName : "Bui", 
+            lastName : "Trung Tuan", 
+            dob : "2003-1-12", 
+            gender : 0, 
+            userType : "staff", 
+            expertise : "PM", 
+            address : "64 Bui Thi Xuan", 
+            province : "Tan Binh", 
+            
         })
         user.save()
         console.log(user)
@@ -20,8 +26,4 @@ function taoUser(){
     } catch (e) {
         console.log(e.message)
     }
-
-    const find = user.find()
-    console.log(find)
-
 }
