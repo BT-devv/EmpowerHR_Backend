@@ -36,4 +36,3 @@ jobs:
         echo "PORT=${{ secrets.PORT }}" >> .env
         echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
         echo "NODE_ENV=${{ secrets.NODE_ENV }}" >> .env
-
