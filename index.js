@@ -15,7 +15,7 @@ connectDB();
 // Cấu hình Middleware
 app.use(express.json()); // Để parse JSON từ body của request
 
-app.use("/api", authRoutes);
+app.use("/api/auth", authRoutes);
 // Route cơ bản
 app.get("/", (req, res) => {
   res.send("🚀 Server đang chạy!");
