@@ -6,4 +6,3 @@ const validateLoginInput = (req, res, next) => {
 };
 
 module.exports = { validateLoginInput };
-
