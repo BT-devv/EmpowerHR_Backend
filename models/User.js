@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+
 // Định nghĩa Schema
 const userSchema = new mongoose.Schema({
     userID: {
@@ -18,6 +19,8 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
     firstName : {
         type : String, 
         required : true, 
@@ -67,7 +70,9 @@ const userSchema = new mongoose.Schema({
         type : Date, 
         default : () => Date.now() //tao ngay mac dinh la hom nay //tao ngay moi neu user chua co ngay
     },
+    
 });
+
 
 // Tạo Model
 module.exports  = mongoose.model('User', userSchema);
