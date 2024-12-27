@@ -1,9 +1,11 @@
 // Import các thư viện
+require("dotenv").config(); // Để sử dụng biến môi trường từ .env
 const express = require("express");
 const morgan = require("morgan");
 const connectDB = require("./config/db.js");
 const authRoutes = require('./routes/userRoutes.js');
-require("dotenv").config(); // Để sử dụng biến môi trường từ .env
+
+
 
 // Tạo ứng dụng Express
 const app = express();
