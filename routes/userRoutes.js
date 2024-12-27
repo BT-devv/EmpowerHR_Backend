@@ -1,10 +1,24 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { login,getAllUsers } = require('../controllers/userController');
-const User = require('../models/User');
-const { validateLoginInput, } = require('../middlewares/authMiddleware');
+const {
+  login,
+  getAllUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser,
+  searchUsers,
+} = require("../controllers/userController");
+const User = require("../models/User");
+const { validateLoginInput } = require("../middlewares/authMiddleware");
 
 // Định nghĩa route login với middleware validateLoginInput
-router.post('/login', login);
-router.get('/getallusers', getAllUsers);
+router.post("/users", createUser); // Create User
+router.get("/users/search", searchUsers);
+router.put("/users/:id", updateUser); // Update User
+router.post("/login", login);
+router.get("/getallusers", getAllUsers);
+router.get("/users/:id", getUserById);
+router.delete("/users/:id", deleteUser);
+
 module.exports = router;
