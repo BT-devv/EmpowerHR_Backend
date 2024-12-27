@@ -12,4 +12,19 @@ const connectDB = async () => {
   }
 };
 
-module.exports = connectDB;
+// Hàm seed data vào MongoDB
+const seedData = async (model, data) => {
+  try {
+    // Xóa dữ liệu cũ (nếu cần)
+    await model.deleteMany({});
+    console.log(`Existing data in ${model.modelName} cleared.`);
+
+    // Chèn dữ liệu mẫu
+    await model.insertMany(data);
+    console.log(`Sample data added to collection ${model.modelName}.`);
+  } catch (err) {
+    console.error("Error seeding data:", err.message);
+  }
+};
+
+module.exports = { connectDB, seedData };
