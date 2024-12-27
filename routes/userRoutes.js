@@ -1,9 +1,10 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 const {
   login,
   resetPassword,
   forgotPassword,
+
   getAllUsers,
   getUserById,
   createUser,
@@ -18,12 +19,12 @@ const { validateLoginInput } = require("../middlewares/authMiddleware");
 router.post("/users", createUser); // Create User
 router.post("/resetPassword", resetPassword);
 router.post("/forgotPassword", forgotPassword);
+
 router.get("/users/search", searchUsers);
 router.put("/users/:id", updateUser); // Update User
 router.post("/login", login);
 router.get("/getallusers", getAllUsers);
 router.get("/users/:id", getUserById);
 router.delete("/users/:id", deleteUser);
-
 
 module.exports = router;

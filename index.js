@@ -5,7 +5,6 @@ const authRoutes = require("./routes/userRoutes.js");
 require("dotenv").config();
 
 
-
 // Tạo ứng dụng Express
 const app = express();
 // Sử dụng morgan với định dạng 'dev'

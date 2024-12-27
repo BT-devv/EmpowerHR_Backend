@@ -1,5 +1,7 @@
 const mongoose = require("mongoose");
+
 const bcrypt = require("bcryptjs"); // Giữ nguyên bcryptjs nếu bạn dùng thư viện này
+
 
 // Định nghĩa Schema
 const userSchema = new mongoose.Schema({
@@ -8,6 +10,7 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
     immutable: true, // không cho phép thay đổi trường này
+
   },
   email: {
     type: String,
@@ -21,6 +24,7 @@ const userSchema = new mongoose.Schema({
   },
   resetPasswordToken: String,
   resetPasswordExpire: Date,
+
   firstName: {
     type: String,
     required: true,
@@ -83,5 +87,4 @@ userSchema.pre("save", async function (next) {
     next(err);
   }
 });
-
 module.exports = mongoose.model("User", userSchema);

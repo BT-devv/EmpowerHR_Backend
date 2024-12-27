@@ -1,3 +1,4 @@
+
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
@@ -124,12 +125,39 @@ const forgotPassword = async (req, res) => {
             message: 'Có lỗi xảy ra. Vui lòng thử lại sau.',
             error: error.message,  // Trả về chi tiết lỗi
         });
+
     }
+
+    if (password !== user.password) {
+      //   console.log("Email nè :"+email);
+      //   console.log("pass nè :"+password);
+      //   console.log("pass mẫu nè :"+user.password);
+      return res.status(401).json({
+        success: false,
+        message: "Mật khẩu không đúng. Vui lòng thử lại.",
+      });
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Đăng nhập thành công!",
+      token,
+    });
+  } catch (error) {
+    // Xử lý lỗi nếu có
+    console.error("Lỗi đăng nhập:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Có lỗi xảy ra. Vui lòng thử lại sau.",
+    });
+  }
 };
-
-
-
-
 
 // Xử lý đặt lại mật khẩu
 const resetPassword = async (req, res) => {
@@ -185,6 +213,7 @@ const getAllUsers = async (req, res) => {
     if (!users || users.length === 0) {
       return res.status(404).json({ message: "Không có dữ liệu người dùng" });
     }
+
     res.status(200).json(users); // Trả về dữ liệu dạng JSON
   } catch (error) {
     res.status(500).json({ message: "Lỗi server", error: error.message });
@@ -393,4 +422,3 @@ module.exports = {
   deleteUser,
   searchUsers,
 };
-
