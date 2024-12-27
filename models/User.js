@@ -1,13 +1,16 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
+
+const bcrypt = require("bcryptjs"); // Giữ nguyên bcryptjs nếu bạn dùng thư viện này
+
 
 // Định nghĩa Schema
 const userSchema = new mongoose.Schema({
   userID: {
-    type: String, // Loại dữ liệu: String
-    required: true, // Bắt buộc phải có
-    unique: true, // Đảm bảo UID là duy nhất
-    immutable: true, //không cho phép thay đổi trường này
+    type: String,
+    required: true,
+    unique: true,
+    immutable: true, // không cho phép thay đổi trường này
+
   },
   email: {
     type: String,
@@ -19,6 +22,9 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  resetPasswordToken: String,
+  resetPasswordExpire: Date,
+
   firstName: {
     type: String,
     required: true,
@@ -27,68 +33,58 @@ const userSchema = new mongoose.Schema({
     type: String,
   },
   dateOfBirth: {
-    type: Date, //date là yyyy-mm-dd
+    type: Date,
   },
   gender: {
-    //0-Male 1-Female
-    type: Boolean,
-    require: true,
+    type: Boolean, // 0-Male, 1-Female
+    required: true,
   },
   userType: {
-    type: "String",
-    require: true,
+    type: String,
+    required: true,
   },
   expertise: {
-    //chuyên môn
     type: String,
-    require: true,
+    required: true,
   },
   address: {
     type: String,
-    require: true,
+    required: true,
   },
   province: {
     type: String,
-    require: true,
+    required: true,
   },
   postcode: {
     type: Number,
-    require: true,
+    required: true,
     default: 700000,
   },
   status: {
-    //boolean 1-active 0-inactive
-    type: Boolean,
-    require: true,
+    type: Boolean, // 1-active, 0-inactive
+    required: true,
     default: 1,
   },
   createAt: {
-    immutable: true, //khong cho phep thay doi truong nay
+    immutable: true,
     type: Date,
-    default: () => Date.now(), //tao ngay mac dinh la hom nay //tao ngay moi neu user chua co ngay
+    default: () => Date.now(),
   },
   updateAt: {
     type: Date,
-    default: () => Date.now(), //tao ngay mac dinh la hom nay //tao ngay moi neu user chua co ngay
+    default: () => Date.now(),
   },
 });
 
-// Encrypt password before saving user to the database
+// Middleware để mã hóa mật khẩu trước khi lưu
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) {
-    return next();
-  }
+  if (!this.isModified("password")) return next(); // Chỉ hash nếu mật khẩu được thay đổi
   try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
+    const salt = await bcrypt.genSalt(10); // Tạo salt
+    this.password = await bcrypt.hash(this.password, salt); // Mã hóa mật khẩu
     next();
   } catch (err) {
-    return next(err);
+    next(err);
   }
 });
-
-userSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
-// Tạo Model
 module.exports = mongoose.model("User", userSchema);
