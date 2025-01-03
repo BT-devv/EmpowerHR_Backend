@@ -2,6 +2,9 @@ const express = require("express");
 const router = express.Router();
 const {
   login,
+  resetPassword,
+  forgotPassword,
+
   getAllUsers,
   getUserById,
   createUser,
@@ -14,6 +17,9 @@ const { validateLoginInput } = require("../middlewares/authMiddleware");
 
 // Định nghĩa route login với middleware validateLoginInput
 router.post("/users", createUser); // Create User
+router.post("/resetPassword", resetPassword);
+router.post("/forgotPassword", forgotPassword);
+
 router.get("/users/search", searchUsers);
 router.put("/users/:id", updateUser); // Update User
 router.post("/login", login);

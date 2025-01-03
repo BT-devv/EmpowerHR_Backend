@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
+
+const bcrypt = require("bcryptjs"); // Giữ nguyên bcryptjs nếu bạn dùng thư viện này
 
 // Định nghĩa Schema
 const userSchema = new mongoose.Schema({
@@ -97,22 +98,15 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// Encrypt password before saving user to the database
+// Middleware để mã hóa mật khẩu trước khi lưu
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) {
-    return next();
-  }
+  if (!this.isModified("password")) return next(); // Chỉ hash nếu mật khẩu được thay đổi
   try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
+    const salt = await bcrypt.genSalt(10); // Tạo salt
+    this.password = await bcrypt.hash(this.password, salt); // Mã hóa mật khẩu
     next();
   } catch (err) {
-    return next(err);
+    next(err);
   }
 });
-
-userSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
-// Tạo Model
 module.exports = mongoose.model("User", userSchema);
