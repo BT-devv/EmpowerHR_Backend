@@ -1,13 +1,12 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs"); // Giữ nguyên bcryptjs nếu bạn dùng thư viện này
+const bcrypt = require("bcryptjs");
 
-// Định nghĩa Schema
 const userSchema = new mongoose.Schema({
   userID: {
     type: String,
     required: true,
     unique: true,
-    immutable: true, // không cho phép thay đổi trường này
+    immutable: true, // Không cho phép thay đổi
   },
   email: {
     type: String,
@@ -32,8 +31,9 @@ const userSchema = new mongoose.Schema({
     type: Date,
   },
   gender: {
-    type: Boolean, // 0-Male, 1-Female
+    type: Number, // 0 - Male, 1 - Female
     required: true,
+    enum: [0, 1],
   },
   userType: {
     type: String,
@@ -57,7 +57,7 @@ const userSchema = new mongoose.Schema({
     default: 700000,
   },
   status: {
-    type: Boolean, // 1-active, 0-inactive
+    type: Boolean, // 1 - active, 0 - inactive
     required: true,
     default: 1,
   },
@@ -82,6 +82,19 @@ userSchema.pre("save", async function (next) {
   } catch (err) {
     next(err);
   }
+});
+
+// Phương thức để kiểm tra mật khẩu khi người dùng đăng nhập
+userSchema.methods.matchPassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Middleware tự động cập nhật `updateAt` mỗi khi thay đổi dữ liệu
+userSchema.pre("save", function (next) {
+  if (this.isModified() || this.isNew) {
+    this.updateAt = Date.now();
+  }
+  next();
 });
 
 module.exports = mongoose.model("User", userSchema);
