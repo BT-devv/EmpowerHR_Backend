@@ -3,19 +3,21 @@ const User = require("./models/User"); // Đường dẫn tới file model User
 
 // Dữ liệu mẫu
 const user = new User({
-  userID: "U001",
-  email: "admin@gmail.com",
-  password: "password123", // Sẽ được hash
+  avatar: "https://example.com/avatar.jpg",
+  employeeID: "EMP-2500001",
   firstName: "Admin",
-  lastName: "Admin",
+  lastName: "Nguyen",
   dateOfBirth: "1990-01-01",
-  gender: 0,
-  userType: "admin",
-  expertise: "Software Engineering",
-  address: "123 Main Street",
-  province: "Hanoi",
-  postcode: 100000,
-  status: 1,
+  gender: "Male",
+  idCardNumber: "12345678910",
+  phoneNumber: "(+84) 000 111 2222",
+  email: "example@gmail.com",
+  password: "StrongPass123",
+  bankAccountNumber: "1234567890",
+  department: "Engineering",
+  startDate: "2025-01-03T12:08:53.500Z",
+  role: "Admin",
+  employeeType: "Fulltime",
 });
 
 // Hàm chạy seed

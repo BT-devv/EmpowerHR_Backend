@@ -41,7 +41,7 @@ const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user._id, email: user.email },
+      { employeeID: user._id, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
@@ -89,19 +89,19 @@ const getUserById = async (req, res) => {
 
 const createUser = async (req, res) => {
   const {
-    userID,
-    email,
-    password,
+    avatar,
     firstName,
     lastName,
     dateOfBirth,
     gender,
-    userType,
-    expertise,
-    address,
-    province,
-    postcode,
-    status,
+    idCardNumber,
+    phoneNumber,
+    email,
+    password,
+    bankAccountNumber,
+    department,
+    role,
+    employeeType,
   } = req.body;
 
   try {
@@ -116,19 +116,19 @@ const createUser = async (req, res) => {
 
     // Tạo user mới
     const newUser = new User({
-      userID,
-      email,
-      password,
+      avatar,
       firstName,
       lastName,
       dateOfBirth,
       gender,
-      userType,
-      expertise,
-      address,
-      province,
-      postcode,
-      status,
+      idCardNumber,
+      phoneNumber,
+      email,
+      password,
+      bankAccountNumber,
+      department,
+      role,
+      employeeType,
     });
 
     // Lưu user vào database
@@ -152,21 +152,23 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   const { id } = req.params;
   const {
-    email,
+    avatar,
     firstName,
     lastName,
     dateOfBirth,
     gender,
-    userType,
-    expertise,
-    address,
-    province,
-    postcode,
-    status,
+    idCardNumber,
+    phoneNumber,
+    email,
+    password,
+    bankAccountNumber,
+    department,
+    role,
+    employeeType,
   } = req.body;
 
   try {
-    // Tìm người dùng theo userID
+    // Tìm người dùng theo ID
     const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({
@@ -176,17 +178,22 @@ const updateUser = async (req, res) => {
     }
 
     // Cập nhật thông tin người dùng
-    user.email = email || user.email;
+    user.avatar = avatar || user.avatar;
     user.firstName = firstName || user.firstName;
     user.lastName = lastName || user.lastName;
     user.dateOfBirth = dateOfBirth || user.dateOfBirth;
     user.gender = gender !== undefined ? gender : user.gender;
-    user.userType = userType || user.userType;
-    user.expertise = expertise || user.expertise;
-    user.address = address || user.address;
-    user.province = province || user.province;
-    user.postcode = postcode || user.postcode;
-    user.status = status !== undefined ? status : user.status;
+    user.idCardNumber = idCardNumber || user.idCardNumber;
+    user.phoneNumber = phoneNumber || user.phoneNumber;
+    user.email = email || user.email;
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(password, salt);
+    }
+    user.bankAccountNumber = bankAccountNumber || user.bankAccountNumber;
+    user.department = department || user.department;
+    user.role = role || user.role;
+    user.employeeType = employeeType || user.employeeType;
 
     // Lưu thay đổi
     await user.save();
@@ -205,6 +212,7 @@ const updateUser = async (req, res) => {
     });
   }
 };
+
 const deleteUser = async (req, res) => {
   const { id } = req.params;
 

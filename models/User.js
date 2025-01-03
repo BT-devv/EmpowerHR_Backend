@@ -3,74 +3,98 @@ const bcrypt = require("bcryptjs");
 
 // Định nghĩa Schema
 const userSchema = new mongoose.Schema({
-  userID: {
-    type: String, // Loại dữ liệu: String
-    required: true, // Bắt buộc phải có
-    unique: true, // Đảm bảo UID là duy nhất
-    immutable: true, //không cho phép thay đổi trường này
+  avatar: {
+    type: String, // Lưu đường dẫn đến ảnh
+    required: true,
+  },
+  employeeID: {
+    type: String,
+    unique: true, // Đảm bảo là duy nhất
+    immutable: true, // Không được chỉnh sửa sau khi tạo
+  },
+  firstName: {
+    type: String,
+    required: true,
+    minlength: 1,
+    maxlength: 64,
+  },
+  lastName: {
+    type: String,
+    required: true,
+    minlength: 1,
+    maxlength: 64,
+  },
+  gender: {
+    type: String,
+    enum: ["Male", "Female", "Other"],
+  },
+  dateOfBirth: {
+    type: Date,
+    required: true,
+    validate: {
+      validator: (value) => {
+        const age = new Date().getFullYear() - value.getFullYear();
+        return age >= 18; // Đảm bảo người dùng đủ 18 tuổi
+      },
+      message: "Employee must be at least 18 years old.",
+    },
+  },
+  idCardNumber: {
+    type: String,
+    required: true,
+    unique: true,
+    match: /^\d{11}$/, // Chỉ chấp nhận 11 chữ số
+  },
+  phoneNumber: {
+    type: String,
+    required: true,
+    unique: true,
+    match: /^\(\+84\) 0\d{2} \d{3} \d{4}$/, // Định dạng (+84) 0XX XXX XXXX
   },
   email: {
     type: String,
-    lowercase: true,
     required: true,
     unique: true,
+    match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, // Định dạng email chuẩn
   },
   password: {
     type: String,
     required: true,
   },
-  firstName: {
+  bankAccountNumber: {
+    type: String,
+  },
+  department: {
+    type: String,
+  },
+  startDate: {
+    type: Date,
+    default: () => Date.now(),
+    immutable: true, // Không được thay đổi sau khi tạo
+  },
+  role: {
+    type: String,
+    enum: ["Admin", "Manager", "Employee"],
+  },
+  employeeType: {
     type: String,
     required: true,
+    enum: ["Fulltime", "Partime", "Collab", "Intern"],
   },
-  lastName: {
-    type: String,
-  },
-  dateOfBirth: {
-    type: Date, //date là yyyy-mm-dd
-  },
-  gender: {
-    //0-Male 1-Female
-    type: Boolean,
-    require: true,
-  },
-  userType: {
-    type: "String",
-    require: true,
-  },
-  expertise: {
-    //chuyên môn
-    type: String,
-    require: true,
-  },
-  address: {
-    type: String,
-    require: true,
-  },
-  province: {
-    type: String,
-    require: true,
-  },
-  postcode: {
-    type: Number,
-    require: true,
-    default: 700000,
-  },
-  status: {
-    //boolean 1-active 0-inactive
-    type: Boolean,
-    require: true,
-    default: 1,
-  },
-  createAt: {
-    immutable: true, //khong cho phep thay doi truong nay
-    type: Date,
-    default: () => Date.now(), //tao ngay mac dinh la hom nay //tao ngay moi neu user chua co ngay
-  },
-  updateAt: {
-    type: Date,
-    default: () => Date.now(), //tao ngay mac dinh la hom nay //tao ngay moi neu user chua co ngay
-  },
+});
+// Tự động tạo Employee ID
+userSchema.pre("save", async function (next) {
+  if (!this.employeeID) {
+    const year = new Date().getFullYear().toString().slice(-2); // Lấy năm hiện tại (VD: 24)
+    const companyPrefix = "EMP"; // Prefix của công ty
+
+    // Đếm số lượng tài liệu trong collection
+    const count = await mongoose.model("User").countDocuments();
+    const id = String(count + 1).padStart(5, "0"); // Tạo số thứ tự tăng dần với 5 chữ số
+
+    this.employeeID = `${companyPrefix}-${year}${id}`;
+  }
+  next();
 });
 
 // Encrypt password before saving user to the database
