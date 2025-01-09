@@ -1,4 +1,7 @@
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+
+=======
 
 const bcrypt = require("bcryptjs"); // Giữ nguyên bcryptjs nếu bạn dùng thư viện này
 
@@ -31,6 +34,7 @@ const userSchema = new mongoose.Schema({
   },
   dateOfBirth: {
     type: Date,
+
     required: true,
     validate: {
       validator: (value) => {
@@ -39,6 +43,7 @@ const userSchema = new mongoose.Schema({
       },
       message: "Employee must be at least 18 years old.",
     },
+
   },
   idCardNumber: {
     type: String,
@@ -67,6 +72,7 @@ const userSchema = new mongoose.Schema({
   },
   department: {
     type: String,
+
   },
   startDate: {
     type: Date,
@@ -109,4 +115,18 @@ userSchema.pre("save", async function (next) {
     next(err);
   }
 });
+
+// Phương thức để kiểm tra mật khẩu khi người dùng đăng nhập
+userSchema.methods.matchPassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Middleware tự động cập nhật `updateAt` mỗi khi thay đổi dữ liệu
+userSchema.pre("save", function (next) {
+  if (this.isModified() || this.isNew) {
+    this.updateAt = Date.now();
+  }
+  next();
+});
+
 module.exports = mongoose.model("User", userSchema);
