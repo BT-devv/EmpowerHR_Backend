@@ -1,7 +1,4 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
-
-=======
 
 const bcrypt = require("bcryptjs"); // Giữ nguyên bcryptjs nếu bạn dùng thư viện này
 
@@ -43,7 +40,6 @@ const userSchema = new mongoose.Schema({
       },
       message: "Employee must be at least 18 years old.",
     },
-
   },
   idCardNumber: {
     type: String,
@@ -72,7 +68,6 @@ const userSchema = new mongoose.Schema({
   },
   department: {
     type: String,
-
   },
   startDate: {
     type: Date,
