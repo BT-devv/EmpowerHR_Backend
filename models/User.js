@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const moment = require("moment-timezone");
 
 const bcrypt = require("bcryptjs"); // Giữ nguyên bcryptjs nếu bạn dùng thư viện này
 
@@ -32,7 +33,6 @@ const userSchema = new mongoose.Schema({
   dateOfBirth: {
     type: Date,
 
-    required: true,
     validate: {
       validator: (value) => {
         const age = new Date().getFullYear() - value.getFullYear();
@@ -71,7 +71,8 @@ const userSchema = new mongoose.Schema({
   },
   startDate: {
     type: Date,
-    default: () => Date.now(),
+    default: () =>
+      moment().tz("Asia/Ho_Chi_Minh").startOf("day").format("YYYY-MM-DD"),
     immutable: true, // Không được thay đổi sau khi tạo
   },
   role: {
@@ -83,6 +84,23 @@ const userSchema = new mongoose.Schema({
     required: true,
     enum: ["Fulltime", "Partime", "Collab", "Intern"],
   },
+  status: {
+    type: String,
+    enum: ["Active", "Inactive"],
+    default: "Inactive", // Assuming default status is Active
+  },
+  address: {
+    type: String,
+  },
+  province: {
+    type: String,
+  },
+  city: {
+    type: String,
+  },
+  postcode: {
+    type: String,
+  },
 });
 // Tự động tạo Employee ID
 userSchema.pre("save", async function (next) {
@@ -90,11 +108,22 @@ userSchema.pre("save", async function (next) {
     const year = new Date().getFullYear().toString().slice(-2); // Lấy năm hiện tại (VD: 24)
     const companyPrefix = "EMP"; // Prefix của công ty
 
-    // Đếm số lượng tài liệu trong collection
-    const count = await mongoose.model("User").countDocuments();
-    const id = String(count + 1).padStart(5, "0"); // Tạo số thứ tự tăng dần với 5 chữ số
+    // Tìm tài liệu có employeeID lớn nhất
+    const lastUser = await mongoose
+      .model("User")
+      .findOne({ employeeID: { $regex: `^${companyPrefix}-${year}` } }) // Tìm theo năm hiện tại
+      .sort({ employeeID: -1 }) // Sắp xếp giảm dần
+      .exec();
 
-    this.employeeID = `${companyPrefix}-${year}${id}`;
+    let newIDNumber = 1; // Giá trị mặc định nếu chưa có employeeID nào
+    if (lastUser && lastUser.employeeID) {
+      const lastID = parseInt(lastUser.employeeID.split("-")[1].slice(2)); // Lấy phần số từ employeeID
+      newIDNumber = lastID + 1; // Tăng giá trị lên 1
+    }
+
+    // Tạo employeeID mới
+    const newID = String(newIDNumber).padStart(5, "0"); // Định dạng với 5 chữ số
+    this.employeeID = `${companyPrefix}-${year}${newID}`;
   }
   next();
 });

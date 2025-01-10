@@ -1,10 +1,9 @@
 // routes/attendanceRoutes.js
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const attendanceController = require('../controllers/attendanceController');
+const { checkIn, checkOut } = require("../controllers/attendanceController");
 
-// Đảm bảo đường dẫn đúng
-router.post('/attendance/check-in', attendanceController.checkIn);
-router.post('/attendance/check-out', attendanceController.checkOut);
+router.post("/attendance/check-in", checkIn); // Endpoint check-in
+router.post("/attendance/check-out", checkOut); // Endpoint check-out
 
 module.exports = router;
