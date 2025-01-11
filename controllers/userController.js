@@ -1,6 +1,7 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const moment = require("moment-timezone");
 const crypto = require("crypto");
 // const nodemailer = require("nodemailer");
 
@@ -240,6 +241,11 @@ const createUser = async (req, res) => {
     department,
     role,
     employeeType,
+    status,
+    address,
+    province,
+    city,
+    postcode,
   } = req.body;
 
   try {
@@ -267,6 +273,11 @@ const createUser = async (req, res) => {
       department,
       role,
       employeeType,
+      status,
+      address,
+      province,
+      city,
+      postcode,
     });
 
     // Lưu user vào database
@@ -303,10 +314,14 @@ const updateUser = async (req, res) => {
     department,
     role,
     employeeType,
+    status,
+    address,
+    province,
+    city,
+    postcode,
   } = req.body;
 
   try {
-    // Tìm người dùng theo ID
     const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({
@@ -315,7 +330,6 @@ const updateUser = async (req, res) => {
       });
     }
 
-    // Cập nhật thông tin người dùng
     user.avatar = avatar || user.avatar;
     user.firstName = firstName || user.firstName;
     user.lastName = lastName || user.lastName;
@@ -332,8 +346,12 @@ const updateUser = async (req, res) => {
     user.department = department || user.department;
     user.role = role || user.role;
     user.employeeType = employeeType || user.employeeType;
+    user.status = status || user.status;
+    user.address = address || user.address;
+    user.province = province || user.province;
+    user.city = city || user.city;
+    user.postcode = postcode || user.postcode;
 
-    // Lưu thay đổi
     await user.save();
 
     res.status(200).json({

@@ -1,47 +1,104 @@
-const Attendance = require('../models/attendance');
+const Attendance = require("../models/attendance");
+const User = require("../models/User");
+const moment = require("moment-timezone");
+const checkIn = async (req, res) => {
+  const { employeeID, checkIn } = req.body;
 
-// Check-in
-exports.checkIn = async (req, res) => {
   try {
-    const { userId, checkIn } = req.body;
+    // Tìm user dựa trên employeeID
+    const user = await User.findOne({ employeeID });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found",
+      });
+    }
 
-    // Kiểm tra nếu đã check-in trong ngày
-    const today = new Date().toISOString().split('T')[0];
-    const existingRecord = await Attendance.findOne({ userId, date: today });
-    if (existingRecord) return res.status(400).json({ message: 'User already checked in today' });
+    const today = moment()
+      .tz("Asia/Ho_Chi_Minh")
+      .startOf("day")
+      .format("YYYY-MM-DD");
 
-    const attendance = new Attendance({ userId, date: today, checkIn });
+    // Tìm attendance dựa trên employeeID và ngày
+    let attendance = await Attendance.findOne({ employeeID, date: today });
+
+    if (!attendance) {
+      // Nếu chưa có attendance thì tạo mới
+      attendance = new Attendance({
+        employeeID,
+        name: `${user.firstName} ${user.lastName}`,
+        date: today,
+        checkIn,
+      });
+    } else {
+      // Nếu đã tồn tại thì thông báo đã check-in
+      return res.status(404).json({
+        success: false,
+        message: "Already checked in for today",
+      });
+    }
+
     await attendance.save();
-    res.status(201).json({ message: 'Checked in successfully', attendance });
+
+    // Trả về response thành công
+    res.status(200).json({
+      success: true,
+      message: "Check-in successful",
+      data: attendance,
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Error during check-in', error });
+    console.error("Check-in error:", error); // Log lỗi
+    res.status(500).json({
+      success: false,
+      message: "Error during check-in",
+      error: error.message, // Trả về thông tin lỗi
+    });
   }
 };
 
-// Check-out
-exports.checkOut = async (req, res) => {
-  try {
-    const { userId, checkOut } = req.body;
+const checkOut = async (req, res) => {
+  const { employeeID, checkOut } = req.body;
 
-    const today = new Date().toISOString().split('T')[0];
-    const attendance = await Attendance.findOne({ userId, date: today });
-    if (!attendance) return res.status(404).json({ message: 'No check-in record found for today' });
+  try {
+    const today = moment()
+      .tz("Asia/Ho_Chi_Minh")
+      .startOf("day")
+      .format("YYYY-MM-DD");
+
+    const attendance = await Attendance.findOne({ employeeID, date: today });
+
+    if (!attendance) {
+      return res.status(404).json({
+        success: false,
+        message: "No Check In record found for today",
+      });
+    }
+
+    // Check if checkOut is already done
+    if (attendance.checkOut) {
+      return res.status(400).json({
+        success: false,
+        message: "Already checked out for today",
+      });
+    }
 
     attendance.checkOut = checkOut;
-
-    // Tính toán giờ làm việc
-    const checkInTime = new Date(`${today}T${attendance.checkIn}`);
-    const checkOutTime = new Date(`${today}T${checkOut}`);
-    const workedMilliseconds = checkOutTime - checkInTime;
-    const hoursWorked = workedMilliseconds / (1000 * 60 * 60); // Chuyển đổi ra giờ
-    attendance.hoursWorked = Math.max(0, hoursWorked);
-
-    // Tính overtime (giả sử giờ làm việc tiêu chuẩn là 8 tiếng)
-    attendance.overtimeHours = Math.max(0, hoursWorked - 8);
-
     await attendance.save();
-    res.status(200).json({ message: 'Checked out successfully', attendance });
+
+    res.status(200).json({
+      success: true,
+      message: "Check-out successful",
+      data: attendance,
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Error during check-out', error });
+    res.status(500).json({
+      success: false,
+      message: "Error during check-out",
+    });
   }
+};
+
+module.exports = {
+  checkIn,
+  checkOut,
 };
