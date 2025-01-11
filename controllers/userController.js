@@ -428,6 +428,40 @@ const searchUsers = async (req, res) => {
   }
 };
 
+const getNextEmployeeID = async (req, res) => {
+  try {
+    const year = new Date().getFullYear().toString().slice(-2); // Lấy 2 số cuối của năm hiện tại
+    const companyPrefix = "EMP"; // Prefix của công ty
+
+    // Tìm tài liệu có employeeID lớn nhất trong năm hiện tại
+    const lastUser = await User.findOne({
+      employeeID: { $regex: `^${companyPrefix}-${year}` },
+    })
+      .sort({ employeeID: -1 })
+      .exec();
+
+    let newIDNumber = 1; // Giá trị mặc định nếu chưa có employeeID nào
+    if (lastUser && lastUser.employeeID) {
+      const lastID = parseInt(lastUser.employeeID.split("-")[1].slice(2)); // Lấy phần số từ employeeID
+      newIDNumber = lastID + 1; // Tăng giá trị lên 1
+    }
+
+    // Tạo employeeID tiếp theo
+    const newID = String(newIDNumber).padStart(5, "0");
+    const nextEmployeeID = `${companyPrefix}-${year}${newID}`;
+
+    return res.status(200).json({
+      success: true,
+      employeeID: nextEmployeeID,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate next employeeID.",
+    });
+  }
+};
 module.exports = {
   login,
   resetPassword,
@@ -438,4 +472,5 @@ module.exports = {
   createUser,
   deleteUser,
   searchUsers,
+  getNextEmployeeID,
 };
