@@ -11,11 +11,10 @@ const {
   updateUser,
   deleteUser,
   searchUsers,
+  getNextEmployeeID,
 } = require("../controllers/userController");
 const User = require("../models/User");
 const { validateLoginInput } = require("../middlewares/authMiddleware");
-
-
 
 // Định nghĩa route login với middleware validateLoginInput
 router.post("/users", createUser); // Create User
@@ -28,6 +27,6 @@ router.post("/login", login);
 router.get("/getallusers", getAllUsers);
 router.get("/users/:id", getUserById);
 router.delete("/users/:id", deleteUser);
-
+router.get("/newEmployeeID", getNextEmployeeID);
 
 module.exports = router;
