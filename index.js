@@ -3,23 +3,20 @@ const mongoose = require("mongoose");
 const morgan = require("morgan");
 const cors = require("cors"); // Import CORS middleware
 const { connectDB } = require("./config/db.js");
-const authRoutes = require("./routes/userRoutes.js");
-const attendanceRoutes = require("./routes/attendanceRoutes");
+const routes = require("./routes/index.js");
 
 require("dotenv").config();
 
 // Tạo ứng dụng Express
 const app = express();
-
-// Sử dụng morgan với định dạng 'dev'
 app.use(morgan("dev"));
 
 // Enable CORS
 app.use(
   cors({
-    origin: "http://localhost:5173", // Allow requests from the frontend
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allow specific methods
-    credentials: true, // If cookies or authentication headers are needed
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
   })
 );
 
@@ -28,10 +25,10 @@ connectDB();
 
 // Cấu hình Middleware
 app.use(express.json()); // Để parse JSON từ body của request
+app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use("/api", authRoutes);
-app.use("/api", attendanceRoutes);
+app.use("/api", routes);
 
 // Route cơ bản
 app.get("/", (req, res) => {

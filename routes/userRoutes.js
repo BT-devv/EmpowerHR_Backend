@@ -17,16 +17,16 @@ const User = require("../models/User");
 const { validateLoginInput } = require("../middlewares/authMiddleware");
 
 // Định nghĩa route login với middleware validateLoginInput
-router.post("/users", createUser); // Create User
-router.post("/resetPassword", resetPassword);
-router.post("/forgotPassword", forgotPassword);
+router.post("/create-user", createUser); // Create User
+router.post("/reset-password", resetPassword);
+router.post("/forgot-password", forgotPassword);
 
-router.get("/users/search", searchUsers);
-router.put("/users/:id", updateUser); // Update User
+router.get("/search", searchUsers);
+router.put("/:id", updateUser); // Update User
 router.post("/login", login);
-router.get("/getallusers", getAllUsers);
-router.get("/users/:id", getUserById);
-router.delete("/users/:id", deleteUser);
-router.get("/newEmployeeID", getNextEmployeeID);
+router.get("/users", getAllUsers);
+router.get("/:id", getUserById);
+router.delete("/:id", deleteUser);
+router.get("/new-employee-id", getNextEmployeeID);
 
 module.exports = router;
