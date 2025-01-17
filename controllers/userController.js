@@ -478,17 +478,24 @@ const getQRCode = async (req, res) => {
       });
     }
 
-    // Chuẩn bị dữ liệu để mã hóa vào QR Code dưới dạng HTML
-    const qrData = `
+    // Chuẩn bị dữ liệu để mã hóa vào QR Code
+    const qrData = {
+      EmployeeID: user.employeeID,
+      Name: `${user.firstName} ${user.lastName}`,
+      Department: user.department,
+      Role: user.role,
+      EmployeeType: user.employeeType,
+    };
+    /*const qrData = `
       EmployeeID: ${user.employeeID}
       Name: ${user.firstName} ${user.lastName}
       Department: ${user.department}
       Role: ${user.role}
       EmployeeType: ${user.employeeType}
-    `;
+    `;*/
 
     // Tạo mã QR dưới dạng URL image
-    QRCode.toDataURL(qrData, (err, url) => {
+    QRCode.toDataURL(JSON.stringify(qrData), (err, url) => {
       if (err) {
         return res.status(500).json({
           success: false,
