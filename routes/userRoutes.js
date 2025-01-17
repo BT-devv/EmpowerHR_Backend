@@ -12,6 +12,7 @@ const {
   deleteUser,
   searchUsers,
   getNextEmployeeID,
+  getQRCode,
 } = require("../controllers/userController");
 const User = require("../models/User");
 const { validateLoginInput } = require("../middlewares/authMiddleware");
@@ -28,5 +29,7 @@ router.get("/users", getAllUsers);
 router.get("/:id", getUserById);
 router.delete("/:id", deleteUser);
 router.get("/new-employee-id", getNextEmployeeID);
+// Route để lấy mã QR
+router.get("/qrcode/:id", getQRCode);
 
 module.exports = router;
