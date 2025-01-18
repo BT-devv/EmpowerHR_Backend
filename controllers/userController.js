@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const moment = require("moment-timezone");
 const crypto = require("crypto");
+const QRCode = require("qrcode");
 // const nodemailer = require("nodemailer");
 
 const login = async (req, res) => {
@@ -462,6 +463,63 @@ const getNextEmployeeID = async (req, res) => {
     });
   }
 };
+
+// API để hiển thị mã QR
+const getQRCode = async (req, res) => {
+  const { id } = req.params; // Nhận ID người dùng từ URL
+
+  try {
+    // Tìm người dùng theo ID
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Chuẩn bị dữ liệu để mã hóa vào QR Code
+    const qrData = {
+      EmployeeID: user.employeeID,
+      Name: `${user.firstName} ${user.lastName}`,
+      Department: user.department,
+      Role: user.role,
+      EmployeeType: user.employeeType,
+    };
+    /*const qrData = `
+      EmployeeID: ${user.employeeID}
+      Name: ${user.firstName} ${user.lastName}
+      Department: ${user.department}
+      Role: ${user.role}
+      EmployeeType: ${user.employeeType}
+    `;*/
+
+    // Tạo mã QR dưới dạng URL image
+    QRCode.toDataURL(JSON.stringify(qrData), (err, url) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: "Error generating QR Code",
+          error: err.message,
+        });
+      }
+
+      // Trả về mã QR dưới dạng image URL
+      res.status(200).json({
+        success: true,
+        message: "QR Code generated successfully",
+        qrCode: url,
+      });
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "An error occurred",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   login,
   resetPassword,
@@ -473,4 +531,5 @@ module.exports = {
   deleteUser,
   searchUsers,
   getNextEmployeeID,
+  getQRCode,
 };

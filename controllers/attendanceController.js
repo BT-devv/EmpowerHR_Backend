@@ -1,11 +1,12 @@
 const Attendance = require("../models/attendance");
 const User = require("../models/User");
 const moment = require("moment-timezone");
+
 const checkIn = async (req, res) => {
-  const { employeeID, checkIn } = req.body;
+  const { employeeID } = req.body; // Nhận employeeID từ body
+  const checkInTime = moment().tz("Asia/Ho_Chi_Minh").format("HH:mm:ss"); // Thời gian check-in hiện tại
 
   try {
-    // Tìm user dựa trên employeeID
     const user = await User.findOne({ employeeID });
     if (!user) {
       return res.status(404).json({
@@ -18,21 +19,17 @@ const checkIn = async (req, res) => {
       .tz("Asia/Ho_Chi_Minh")
       .startOf("day")
       .format("YYYY-MM-DD");
-
-    // Tìm attendance dựa trên employeeID và ngày
     let attendance = await Attendance.findOne({ employeeID, date: today });
 
     if (!attendance) {
-      // Nếu chưa có attendance thì tạo mới
       attendance = new Attendance({
         employeeID,
         name: `${user.firstName} ${user.lastName}`,
         date: today,
-        checkIn,
+        checkIn: checkInTime,
       });
     } else {
-      // Nếu đã tồn tại thì thông báo đã check-in
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
         message: "Already checked in for today",
       });
@@ -40,41 +37,39 @@ const checkIn = async (req, res) => {
 
     await attendance.save();
 
-    // Trả về response thành công
     res.status(200).json({
       success: true,
       message: "Check-in successful",
       data: attendance,
     });
   } catch (error) {
-    console.error("Check-in error:", error); // Log lỗi
+    console.error("Check-in error:", error);
     res.status(500).json({
       success: false,
       message: "Error during check-in",
-      error: error.message, // Trả về thông tin lỗi
+      error: error.message,
     });
   }
 };
 
 const checkOut = async (req, res) => {
-  const { employeeID, checkOut } = req.body;
+  const { employeeID } = req.body; // Nhận employeeID từ body
+  const checkOutTime = moment().tz("Asia/Ho_Chi_Minh").format("HH:mm:ss"); // Thời gian check-out hiện tại
 
   try {
     const today = moment()
       .tz("Asia/Ho_Chi_Minh")
       .startOf("day")
       .format("YYYY-MM-DD");
-
     const attendance = await Attendance.findOne({ employeeID, date: today });
 
     if (!attendance) {
       return res.status(404).json({
         success: false,
-        message: "No Check In record found for today",
+        message: "No Check-In record found for today",
       });
     }
 
-    // Check if checkOut is already done
     if (attendance.checkOut) {
       return res.status(400).json({
         success: false,
@@ -82,7 +77,7 @@ const checkOut = async (req, res) => {
       });
     }
 
-    attendance.checkOut = checkOut;
+    attendance.checkOut = checkOutTime;
     await attendance.save();
 
     res.status(200).json({
@@ -91,9 +86,11 @@ const checkOut = async (req, res) => {
       data: attendance,
     });
   } catch (error) {
+    console.error("Check-out error:", error);
     res.status(500).json({
       success: false,
       message: "Error during check-out",
+      error: error.message,
     });
   }
 };
