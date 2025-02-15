@@ -4,50 +4,43 @@ const User = require("../models/User");
 const moment = require("moment-timezone");
 const crypto = require("crypto");
 const QRCode = require("qrcode");
-// const nodemailer = require("nodemailer");
+const nodemailer = require("nodemailer");
+const { checkIn, checkOut } = require("./attendanceController");
 
 const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Kiểm tra định dạng email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid email format",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid email format" });
     }
 
-    // Mật khẩu phải từ 8-64 ký tự
     if (password.length < 8 || password.length > 64) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid password length",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid password length" });
     }
 
-    // Tài khoản không tồn tại
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "Account does not exist",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Account does not exist" });
     }
 
-    // So sánh mật khẩu
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Incorrect Password",
-      });
+      return res
+        .status(401)
+        .json({ success: false, message: "Incorrect Password" });
     }
 
-    // Tạo token
+    // Tạo token có chứa userID
     const token = jwt.sign(
-      { employeeID: user._id, email: user.email },
+      { userId: user._id, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
@@ -56,6 +49,7 @@ const login = async (req, res) => {
       success: true,
       message: "Login success!",
       token,
+      userId: user._id, // Gửi userId về client
     });
   } catch (error) {
     console.error("Error Login:", error.message);
@@ -227,6 +221,40 @@ const getUserById = async (req, res) => {
   }
 };
 
+const generatePassword = (length = 8) => {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+};
+
+const sendEmail = async (emailCompany, password) => {
+  try {
+    let transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "lupinnguyen1811@gmail.com", // Thay bằng email của bạn
+        pass: "owdn vxar raqc vznv", // Thay bằng mật khẩu ứng dụng (App Password)
+      },
+    });
+
+    let mailOptions = {
+      from: "lupinnguyen1811@gmail.com",
+      to: emailCompany,
+      subject: "Tài khoản của bạn đã được tạo",
+      text: `Xin chào, tài khoản của bạn đã được tạo. Mật khẩu của bạn là: ${password}. Hãy đăng nhập và đổi mật khẩu ngay.`,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log("📧 Email đã được gửi thành công!");
+  } catch (error) {
+    console.error("❌ Gửi email thất bại:", error.message);
+  }
+};
+
 const createUser = async (req, res) => {
   const {
     avatar,
@@ -236,7 +264,8 @@ const createUser = async (req, res) => {
     gender,
     idCardNumber,
     phoneNumber,
-    email,
+    emailCompany,
+    emailPersonal,
     password,
     bankAccountNumber,
     department,
@@ -250,7 +279,6 @@ const createUser = async (req, res) => {
   } = req.body;
 
   try {
-    // Kiểm tra xem email đã tồn tại chưa
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -258,6 +286,13 @@ const createUser = async (req, res) => {
         message: "Email đã tồn tại. Vui lòng sử dụng email khác.",
       });
     }
+
+    // Tạo mật khẩu ngẫu nhiên nếu người dùng không nhập vào
+    const userPassword = password || generatePassword();
+
+    // Mã hóa mật khẩu
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(userPassword, salt);
 
     // Tạo user mới
     const newUser = new User({
@@ -268,8 +303,9 @@ const createUser = async (req, res) => {
       gender,
       idCardNumber,
       phoneNumber,
-      email,
-      password,
+      emailCompany,
+      emailPersonal,
+      password: hashedPassword,
       bankAccountNumber,
       department,
       role,
@@ -281,12 +317,14 @@ const createUser = async (req, res) => {
       postcode,
     });
 
-    // Lưu user vào database
     await newUser.save();
+
+    // Gửi email chứa mật khẩu cho người dùng
+    await sendEmail(email, userPassword);
 
     res.status(201).json({
       success: true,
-      message: "Tạo người dùng thành công!",
+      message: "Tạo người dùng thành công! Mật khẩu đã được gửi vào email.",
       user: newUser,
     });
   } catch (error) {
@@ -466,19 +504,14 @@ const getNextEmployeeID = async (req, res) => {
 
 // API để hiển thị mã QR
 const getQRCode = async (req, res) => {
-  const { id } = req.params; // Nhận ID người dùng từ URL
-
   try {
-    // Tìm người dùng theo ID
-    const user = await User.findById(id);
+    const user = await User.findById(req.user.userId);
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
-    // Chuẩn bị dữ liệu để mã hóa vào QR Code
     const qrData = {
       EmployeeID: user.employeeID,
       Name: `${user.firstName} ${user.lastName}`,
@@ -486,15 +519,7 @@ const getQRCode = async (req, res) => {
       Role: user.role,
       EmployeeType: user.employeeType,
     };
-    /*const qrData = `
-      EmployeeID: ${user.employeeID}
-      Name: ${user.firstName} ${user.lastName}
-      Department: ${user.department}
-      Role: ${user.role}
-      EmployeeType: ${user.employeeType}
-    `;*/
 
-    // Tạo mã QR dưới dạng URL image
     QRCode.toDataURL(JSON.stringify(qrData), (err, url) => {
       if (err) {
         return res.status(500).json({
@@ -504,7 +529,6 @@ const getQRCode = async (req, res) => {
         });
       }
 
-      // Trả về mã QR dưới dạng image URL
       res.status(200).json({
         success: true,
         message: "QR Code generated successfully",
@@ -519,7 +543,39 @@ const getQRCode = async (req, res) => {
     });
   }
 };
+// API scan QR
+const scanQRCode = async (req, res) => {
+  try {
+    const { qrData, action } = req.body; // Nhận dữ liệu từ QR Code và hành động (check-in hoặc check-out)
 
+    if (!qrData || !qrData.EmployeeID) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid QR Code data",
+      });
+    }
+
+    const employeeID = qrData.EmployeeID;
+
+    if (action === "check-in") {
+      return checkIn({ body: { employeeID } }, res); // Gọi API check-in
+    } else if (action === "check-out") {
+      return checkOut({ body: { employeeID } }, res); // Gọi API check-out
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid action. Use 'check-in' or 'check-out'",
+      });
+    }
+  } catch (error) {
+    console.error("QR Scan error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error processing QR Code",
+      error: error.message,
+    });
+  }
+};
 module.exports = {
   login,
   resetPassword,
@@ -532,4 +588,5 @@ module.exports = {
   searchUsers,
   getNextEmployeeID,
   getQRCode,
+  scanQRCode,
 };
