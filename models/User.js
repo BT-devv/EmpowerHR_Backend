@@ -53,7 +53,13 @@ const userSchema = new mongoose.Schema({
     unique: true,
     match: /^\(\+84\) 0\d{2} \d{3} \d{4}$/, // Định dạng (+84) 0XX XXX XXXX
   },
-  email: {
+  emailCompany: {
+    type: String,
+    required: true,
+    unique: true,
+    match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, // Định dạng email chuẩn
+  },
+  emailPersonal: {
     type: String,
     required: true,
     unique: true,
