@@ -1,11 +1,14 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const User = require("../models/user");
 const moment = require("moment-timezone");
 const crypto = require("crypto");
 const QRCode = require("qrcode");
 const nodemailer = require("nodemailer");
 const { checkIn, checkOut } = require("./attendanceController");
+const { use } = require("../routes/absenceRoutes");
+const { text } = require("body-parser");
+const otpStore = new Map(); // Lưu OTP tạm thời
 
 const login = async (req, res) => {
   const { emailCompany, password } = req.body;
@@ -40,7 +43,11 @@ const login = async (req, res) => {
 
     // Tạo token có chứa userID
     const token = jwt.sign(
-      { userId: user._id, emailCompany: user.emailCompany },
+      {
+        userId: user._id,
+        employeeID: user.employeeID,
+        emailCompany: user.emailCompany,
+      },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
@@ -50,6 +57,7 @@ const login = async (req, res) => {
       message: "Login success!",
       token,
       userId: user._id, // Gửi userId về client
+      employeeID: user.employeeID,
     });
   } catch (error) {
     console.error("Error Login:", error.message);
@@ -60,137 +68,110 @@ const login = async (req, res) => {
   }
 };
 
-// Xử lý yêu cầu quên mật khẩu
 const forgotPassword = async (req, res) => {
-  const { email } = req.body;
+  const { emailCompany } = req.body;
 
   try {
-    // Kiểm tra email có tồn tại trong cơ sở dữ liệu không
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ emailCompany });
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "Email does not exist",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Email không tồn tại" });
     }
 
-    // Nếu email tồn tại, tạo mã reset mật khẩu
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetTokenHash = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
+    // Tạo mã OTP ngẫu nhiên (6 số)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 5 * 60 * 1000; // Hết hạn sau 5 phút
 
-    // Lưu token và thời gian hết hạn vào cơ sở dữ liệu
-    user.resetPasswordToken = resetTokenHash;
-    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // Token hết hạn sau 15 phút
-    await user.save();
+    otpStore.set(emailCompany, { otp, expiresAt });
 
-    // Tạo URL đặt lại mật khẩu
-    const resetURL = `${req.protocol}://${req.get(
-      "host"
-    )}/api/reset-password/${resetToken}`;
+    // Gửi OTP qua email
+    await sendEmail(
+      emailCompany,
+      " [EmpowerHR] - Mã OTP yêu cầu thay đổi mật khẩu ",
+      `Kính gửi ${user.firstName} ${user.lastName},
 
-    // Cấu hình dịch vụ gửi email
-    const transporter = nodemailer.createTransport({
-      service: "Gmail", // Thay bằng dịch vụ phù hợp
-      auth: {
-        user: process.env.EMAIL_USERNAME,
-        pass: process.env.EMAIL_PASSWORD,
-      },
-    });
+Chúng tôi đã nhận được yêu cầu thay đổi mật khẩu hệ thống EmpowerHR. Để hoàn tất quá trình này, vui lòng sử dụng mã OTP (One-Time Password) được cung cấp dưới đây:
 
-    // Cấu hình email gửi đi
-    const mailOptions = {
-      from: process.env.EMAIL_USERNAME,
-      to: user.email,
-      subject: "Yêu cầu đặt lại mật khẩu",
-      text: `Bạn vừa yêu cầu đặt lại mật khẩu. Vui lòng click vào link sau để đặt lại mật khẩu: ${resetURL}`,
-    };
+🔹 Mã OTP: ${otp}
 
-    // Gửi email cho người dùng
-    await transporter.sendMail(mailOptions);
+Mã OTP này có hiệu lực trong vòng 5 phút. Vui lòng nhập mã này để xác nhận yêu cầu đổi mật khẩu.
 
-    // Trả về thông báo thành công
-    return res.status(200).json({
-      success: true,
-      message: "Email đặt lại mật khẩu đã được gửi.",
-    });
+Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này.
+
+🔒 Lưu ý: Không chia sẻ mã OTP này với bất kỳ ai.
+
+Nếu bạn gặp bất kỳ vấn đề nào, vui lòng liên hệ [email bộ phận IT] để được hỗ trợ.
+
+Trân trọng,  
+Phòng Hành Chính - Nhân Sự 
+📞 [Số điện thoại hỗ trợ]  
+✉️ [Email hỗ trợ]`
+    );
+
+    res
+      .status(200)
+      .json({ success: true, message: "OTP đã được gửi đến email" });
   } catch (error) {
-    console.error("Error in Forgot Password:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Có lỗi xảy ra. Vui lòng thử lại sau.",
-      error: error.message, // Trả về chi tiết lỗi
-    });
+    console.error("Lỗi quên mật khẩu:", error.message);
+    res
+      .status(500)
+      .json({ success: false, message: "Lỗi server, thử lại sau." });
   }
-
-  if (password !== user.password) {
-    //   console.log("Email nè :"+email);
-    //   console.log("pass nè :"+password);
-    //   console.log("pass mẫu nè :"+user.password);
-    return res.status(401).json({
-      success: false,
-      message: "Mật khẩu không đúng. Vui lòng thử lại.",
-    });
-  }
-
-  const token = jwt.sign(
-    { userId: user._id, email: user.email },
-    process.env.JWT_SECRET,
-    { expiresIn: "1h" }
-  );
-
-  return res.status(200).json({
-    success: true,
-    message: "Đăng nhập thành công!",
-    token,
-  });
 };
-
-// Xử lý đặt lại mật khẩu
-const resetPassword = async (req, res) => {
-  const { token } = req.params;
-  const { newPassword } = req.body;
+const verifyOTP = async (req, res) => {
+  const { emailCompany, otp } = req.body;
 
   try {
-    // Mã hóa token để kiểm tra
-    const resetTokenHash = crypto
-      .createHash("sha256")
-      .update(token)
-      .digest("hex");
-
-    // Tìm user theo token và kiểm tra hạn
-    const user = await User.findOne({
-      resetPasswordToken: resetTokenHash,
-      resetPasswordExpire: { $gt: Date.now() }, // Kiểm tra xem token có hết hạn chưa
-    });
-
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid or expired token.",
-      });
+    const storedOTP = otpStore.get(emailCompany);
+    if (!storedOTP) {
+      return res
+        .status(400)
+        .json({ success: false, message: "OTP không hợp lệ hoặc đã hết hạn" });
     }
 
-    // Cập nhật mật khẩu mới
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
-    user.resetPasswordToken = undefined; // Xóa token cũ
-    user.resetPasswordExpire = undefined; // Xóa thời gian hết hạn
+    if (storedOTP.otp !== otp) {
+      return res
+        .status(400)
+        .json({ success: false, message: "OTP không chính xác" });
+    }
 
-    await user.save();
-
+    // Nếu OTP đúng, xóa khỏi bộ nhớ tạm
+    otpStore.delete(emailCompany);
     return res.status(200).json({
       success: true,
-      message: "Password reset successfully.",
+      message: "OTP hợp lệ. Vui lòng nhập mật khẩu mới",
     });
   } catch (error) {
-    console.error("Error in Reset Password:", error.message);
-    return res.status(500).json({
-      success: false,
-      message: "An error occurred. Please try again later.",
-    });
+    console.error("Lỗi xác minh OTP:", error.message);
+    res
+      .status(500)
+      .json({ success: false, message: "Lỗi server, thử lại sau." });
+  }
+};
+const resetPassword = async (req, res) => {
+  const { emailCompany, newPassword } = req.body;
+
+  try {
+    const user = await User.findOne({ emailCompany });
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Email không tồn tại" });
+    }
+
+    // Cập nhật mật khẩu mới không mã hóa
+    user.password = newPassword;
+    await user.save();
+
+    res
+      .status(200)
+      .json({ success: true, message: "Mật khẩu đã được đặt lại thành công" });
+  } catch (error) {
+    console.error("Lỗi đặt lại mật khẩu:", error.message);
+    res
+      .status(500)
+      .json({ success: false, message: "Lỗi server, thử lại sau." });
   }
 };
 
@@ -231,7 +212,7 @@ const generatePassword = (length = 8) => {
   return password;
 };
 
-const sendEmail = async (emailCompany, password) => {
+const sendEmail = async (emailCompany, subject, text) => {
   try {
     let transporter = nodemailer.createTransport({
       service: "gmail",
@@ -244,8 +225,8 @@ const sendEmail = async (emailCompany, password) => {
     let mailOptions = {
       from: "lupinnguyen1811@gmail.com",
       to: emailCompany,
-      subject: "Tài khoản của bạn đã được tạo",
-      text: `Xin chào, tài khoản của bạn đã được tạo. Mật khẩu của bạn là: ${password}. Hãy đăng nhập và đổi mật khẩu ngay.`,
+      subject: subject,
+      text: text,
     };
 
     await transporter.sendMail(mailOptions);
@@ -254,6 +235,7 @@ const sendEmail = async (emailCompany, password) => {
     console.error("❌ Gửi email thất bại:", error.message);
   }
 };
+
 const createUser = async (req, res) => {
   const {
     avatar,
@@ -278,6 +260,8 @@ const createUser = async (req, res) => {
   } = req.body;
 
   try {
+    console.log("📧 Debug: emailCompany nhận được:", emailCompany);
+
     const existingUser = await User.findOne({ emailCompany });
     if (existingUser) {
       return res.status(400).json({
@@ -314,8 +298,32 @@ const createUser = async (req, res) => {
 
     await newUser.save();
 
-    // Gửi email chứa mật khẩu cho người dùng (nếu cần)
-    await sendEmail(emailCompany, userPassword);
+    // Gửi email chứa mật khẩu cho người dùng
+    await sendEmail(
+      emailCompany,
+      " [EmpowerHR] Thông Tin Đăng Nhập Tài Khoản Nhân Viên",
+      `Kính gửi ${firstName} ${lastName},
+    
+Chào mừng bạn đến với hệ thống EmpowerHR! Dưới đây là thông tin đăng nhập tài khoản của bạn:
+    
+🔹 Tên đăng nhập (Email công ty): ${emailCompany}  
+🔹 Mật khẩu tạm thời: ${userPassword}  
+    
+Vui lòng đăng nhập vào hệ thống tại [link hệ thống], sau đó thay đổi mật khẩu để đảm bảo an toàn.
+    
+🔒 Hướng dẫn thay đổi mật khẩu:
+ 1️⃣ Truy cập vào [link hệ thống]  
+ 2️⃣ Đăng nhập bằng thông tin trên  
+ 3️⃣ Vào mục Tài khoản > Đổi mật khẩu 
+ 4️⃣ Xác nhận OTP được gửi qua email và tạo mật khẩu mới  
+    
+Nếu bạn gặp bất kỳ vấn đề nào, vui lòng liên hệ [email bộ phận IT] để được hỗ trợ.
+    
+Trân trọng,  
+Phòng Hành Chính - Nhân Sự  
+📞 [Số điện thoại hỗ trợ]  
+✉️ [Email hỗ trợ]`
+    );
 
     console.log("Mật khẩu sử dụng:", userPassword);
     res.status(201).json({
@@ -575,8 +583,9 @@ const scanQRCode = async (req, res) => {
 };
 module.exports = {
   login,
-  resetPassword,
   forgotPassword,
+  verifyOTP,
+  resetPassword,
   getAllUsers,
   getUserById,
   updateUser,
