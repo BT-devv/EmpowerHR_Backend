@@ -110,6 +110,7 @@ const userSchema = new mongoose.Schema({
     type: String,
   },
 });
+
 // Tự động tạo Employee ID
 userSchema.pre("save", async function (next) {
   if (!this.employeeID) {
@@ -161,4 +162,6 @@ userSchema.pre("save", function (next) {
   next();
 });
 
-module.exports = mongoose.model("User", userSchema);
+const User = mongoose.models.User || mongoose.model("User", userSchema);
+
+module.exports = User;
