@@ -395,6 +395,24 @@ const updateUser = async (req, res) => {
       });
     }
 
+    // Kiểm tra định dạng email hợp lệ
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (emailCompany && !emailRegex.test(emailCompany)) {
+      return res.status(400).json({
+        success: false,
+        message: "Email công ty không hợp lệ.",
+      });
+    }
+
+    if (emailPersonal && !emailRegex.test(emailPersonal)) {
+      return res.status(400).json({
+        success: false,
+        message: "Email cá nhân không hợp lệ.",
+      });
+    }
+
+    // Cập nhật thông tin người dùng
     user.avatar = avatar || user.avatar;
     user.firstName = firstName || user.firstName;
     user.alias = alias || user.alias;
@@ -419,6 +437,7 @@ const updateUser = async (req, res) => {
     user.postcode = postcode || user.postcode;
     user.joiningDate = joiningDate || user.joiningDate;
     user.endDate = endDate || user.endDate;
+
     await user.save();
 
     res.status(200).json({

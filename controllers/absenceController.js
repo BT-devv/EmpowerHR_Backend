@@ -18,7 +18,30 @@ const requestAbsence = async (req, res) => {
 
     const currentDate = moment().tz("Asia/Ho_Chi_Minh");
     const absenceDate = moment(date).tz("Asia/Ho_Chi_Minh");
+    const dayOfWeek = absenceDate.isoWeekday(); // 1 = Thứ 2, ..., 7 = Chủ nhật
 
+    // Kiểm tra ngày không được là quá khứ
+    if (absenceDate.isBefore(currentDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "Không thể gửi yêu cầu nghỉ cho ngày trong quá khứ.",
+      });
+    }
+
+    // Không cho phép request vào Thứ 7 (6) hoặc Chủ nhật (7)
+    if (dayOfWeek === 6 || dayOfWeek === 7) {
+      return res.status(400).json({
+        success: false,
+        message: "Không thể gửi yêu cầu nghỉ vào Thứ 7 hoặc Chủ nhật.",
+      });
+    }
+    // Nếu nghỉ Full Day thì phải xin phép trước ít nhất 1 ngày
+    if (type === "Full Day" && absenceDate.isSameOrBefore(currentDate, "day")) {
+      return res.status(400).json({
+        success: false,
+        message: "Yêu cầu nghỉ Full Day phải được gửi trước ít nhất 1 ngày.",
+      });
+    }
     // Kiểm tra số ngày nghỉ tích lũy của nhân viên
     if (type === "Full Day" || type === "Half Day") {
       if (employee.accumulatedLeaveDays <= 0) {

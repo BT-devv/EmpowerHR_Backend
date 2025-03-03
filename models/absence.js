@@ -40,7 +40,7 @@ const absenceSchema = new mongoose.Schema({
   },
   createdAt: {
     type: Date,
-    default: Date.now,
+    default: () => moment().tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DD"),
   },
 });
 
