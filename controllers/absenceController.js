@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const Absence = require("../models/absence");
-const User = require("../models/user");
+const User = require("../models/User");
 const moment = require("moment-timezone");
 const nodemailer = require("nodemailer");
 

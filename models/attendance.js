@@ -144,4 +144,4 @@ function formatMinutesToTime(minutes) {
   return `${remainingMinutes}m`;
 }
 
-module.exports = mongoose.model("EmployeeAttendance", attendanceSchema);
+module.exports = mongoose.model("Attendance", attendanceSchema);

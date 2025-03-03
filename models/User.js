@@ -26,6 +26,10 @@ const userSchema = new mongoose.Schema({
     minlength: 1,
     maxlength: 64,
   },
+  alias: {
+    type: String,
+    required: true,
+  },
   gender: {
     type: String,
     enum: ["Male", "Female", "Other"],
@@ -71,11 +75,50 @@ const userSchema = new mongoose.Schema({
     minlength: 8,
     maxlength: 64,
   },
+  address: {
+    type: String,
+    required: true,
+  },
+  province: {
+    type: String,
+    required: true,
+  },
+  city: {
+    type: String,
+    required: true,
+  },
+  postcode: {
+    type: String,
+    required: true,
+  },
+  bankName: {
+    type: String,
+  },
   bankAccountNumber: {
     type: String,
+    required: true,
+  },
+  bankAccountName: {
+    type: String,
+    required: true,
+  },
+  employeeType: {
+    type: String,
+    required: true,
+    enum: ["Fulltime", "Partime", "Collab", "Intern"],
   },
   department: {
     type: String,
+    required: true,
+  },
+  jobTitle: {
+    type: String,
+    required: true,
+  },
+  role: {
+    type: String,
+    required: true,
+    enum: ["Admin", "Manager", "Employee"],
   },
   startDate: {
     type: Date,
@@ -83,31 +126,17 @@ const userSchema = new mongoose.Schema({
       moment().tz("Asia/Ho_Chi_Minh").startOf("day").format("YYYY-MM-DD"),
     immutable: true, // Không được thay đổi sau khi tạo
   },
-  role: {
-    type: String,
-    enum: ["Admin", "Manager", "Employee"],
-  },
-  employeeType: {
-    type: String,
+  joiningDate: {
+    type: Date,
     required: true,
-    enum: ["Fulltime", "Partime", "Collab", "Intern"],
+  },
+  endDate: {
+    type: Date,
   },
   status: {
     type: String,
     enum: ["Active", "Inactive"],
-    default: "Inactive", // Assuming default status is Active
-  },
-  address: {
-    type: String,
-  },
-  province: {
-    type: String,
-  },
-  city: {
-    type: String,
-  },
-  postcode: {
-    type: String,
+    default: "Active", // Assuming default status is Active
   },
 });
 
