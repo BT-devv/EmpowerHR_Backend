@@ -16,7 +16,7 @@ const {
   getQRCode,
   scanQRCode,
 } = require("../controllers/userController");
-const User = require("../models/user");
+const User = require("../models/User");
 const { validateLoginInput } = require("../middlewares/authMiddleware");
 const authMiddleware = require("../middlewares/authMiddleware");
 

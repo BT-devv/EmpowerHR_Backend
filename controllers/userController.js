@@ -1,6 +1,7 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const User = require("../models/user");
+const User = require("../models/User");
+const Attendance = require("../models/attendance");
 const moment = require("moment-timezone");
 const crypto = require("crypto");
 const QRCode = require("qrcode");
@@ -27,11 +28,13 @@ const login = async (req, res) => {
         .json({ success: false, message: "Invalid password length" });
     }
 
-    const user = await User.findOne({ emailCompany });
+    // Tìm user theo email & kiểm tra trạng thái Active
+    const user = await User.findOne({ emailCompany, status: "Active" });
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Account does not exist" });
+      return res.status(404).json({
+        success: false,
+        message: "Account does not exist or is inactive",
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -241,6 +244,7 @@ const createUser = async (req, res) => {
     avatar,
     firstName,
     lastName,
+    alias,
     dateOfBirth,
     gender,
     idCardNumber,
@@ -248,15 +252,20 @@ const createUser = async (req, res) => {
     emailCompany,
     emailPersonal,
     password, // Mật khẩu đã được mã hóa trước
-    bankAccountNumber,
-    department,
-    role,
-    employeeType,
-    status,
     address,
     province,
     city,
     postcode,
+    bankName,
+    bankAccountNumber,
+    bankAccountName,
+    department,
+    jobTitle,
+    employeeType,
+    role,
+    joiningDate,
+    endDate,
+    status,
   } = req.body;
 
   try {
@@ -278,6 +287,7 @@ const createUser = async (req, res) => {
       avatar,
       firstName,
       lastName,
+      alias,
       dateOfBirth,
       gender,
       idCardNumber,
@@ -285,15 +295,20 @@ const createUser = async (req, res) => {
       emailCompany,
       emailPersonal,
       password: userPassword, // Giữ nguyên mật khẩu đã được mã hóa
-      bankAccountNumber,
-      department,
-      role,
-      employeeType,
-      status,
       address,
       province,
       city,
       postcode,
+      bankName,
+      bankAccountNumber,
+      bankAccountName,
+      department,
+      jobTitle,
+      employeeType,
+      role,
+      joiningDate,
+      endDate,
+      status,
     });
 
     await newUser.save();
@@ -348,21 +363,27 @@ const updateUser = async (req, res) => {
     avatar,
     firstName,
     lastName,
+    alias,
     dateOfBirth,
     gender,
     idCardNumber,
     phoneNumber,
-    email,
-    password,
-    bankAccountNumber,
-    department,
-    role,
-    employeeType,
-    status,
+    emailCompany,
+    emailPersonal,
     address,
     province,
     city,
     postcode,
+    bankName,
+    bankAccountNumber,
+    bankAccountName,
+    department,
+    jobTitle,
+    employeeType,
+    role,
+    joiningDate,
+    endDate,
+    status,
   } = req.body;
 
   try {
@@ -376,18 +397,19 @@ const updateUser = async (req, res) => {
 
     user.avatar = avatar || user.avatar;
     user.firstName = firstName || user.firstName;
+    user.alias = alias || user.alias;
     user.lastName = lastName || user.lastName;
     user.dateOfBirth = dateOfBirth || user.dateOfBirth;
     user.gender = gender !== undefined ? gender : user.gender;
     user.idCardNumber = idCardNumber || user.idCardNumber;
     user.phoneNumber = phoneNumber || user.phoneNumber;
-    user.email = email || user.email;
-    if (password) {
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(password, salt);
-    }
+    user.emailCompany = emailCompany || user.emailCompany;
+    user.emailPersonal = emailPersonal || user.emailPersonal;
+    user.bankName = bankName || user.bankName;
     user.bankAccountNumber = bankAccountNumber || user.bankAccountNumber;
+    user.bankAccountName = bankAccountName || user.bankAccountName;
     user.department = department || user.department;
+    user.jobTitle = jobTitle || user.jobTitle;
     user.role = role || user.role;
     user.employeeType = employeeType || user.employeeType;
     user.status = status || user.status;
@@ -395,7 +417,8 @@ const updateUser = async (req, res) => {
     user.province = province || user.province;
     user.city = city || user.city;
     user.postcode = postcode || user.postcode;
-
+    user.joiningDate = joiningDate || user.joiningDate;
+    user.endDate = endDate || user.endDate;
     await user.save();
 
     res.status(200).json({
@@ -417,7 +440,12 @@ const deleteUser = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const user = await User.findByIdAndDelete(id);
+    const user = await User.findByIdAndUpdate(
+      id,
+      { status: "Inactive" }, // Chỉ cập nhật trạng thái
+      { new: true } // Trả về document đã cập nhật
+    );
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -427,7 +455,7 @@ const deleteUser = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Xóa người dùng thành công!",
+      message: "Người dùng đã được chuyển sang trạng thái Inactive.",
       user,
     });
   } catch (error) {
@@ -445,7 +473,8 @@ const searchUsers = async (req, res) => {
   try {
     const users = await User.find({
       $or: [
-        { email: { $regex: keyword, $options: "i" } },
+        { emailCompany: { $regex: keyword, $options: "i" } },
+        { emailPersonal: { $regex: keyword, $options: "i" } },
         { firstName: { $regex: keyword, $options: "i" } },
         { lastName: { $regex: keyword, $options: "i" } },
       ],
@@ -551,7 +580,7 @@ const getQRCode = async (req, res) => {
 // API scan QR
 const scanQRCode = async (req, res) => {
   try {
-    const { qrData, action } = req.body; // Nhận dữ liệu từ QR Code và hành động (check-in hoặc check-out)
+    const { qrData } = req.body; // Nhận dữ liệu từ QR Code
 
     if (!qrData || !qrData.EmployeeID) {
       return res.status(400).json({
@@ -561,16 +590,20 @@ const scanQRCode = async (req, res) => {
     }
 
     const employeeID = qrData.EmployeeID;
+    const today = moment()
+      .tz("Asia/Ho_Chi_Minh")
+      .startOf("day")
+      .format("YYYY-MM-DD");
 
-    if (action === "check-in") {
-      return checkIn({ body: { employeeID } }, res); // Gọi API check-in
-    } else if (action === "check-out") {
-      return checkOut({ body: { employeeID } }, res); // Gọi API check-out
+    // Kiểm tra trạng thái điểm danh hôm nay
+    let attendance = await Attendance.findOne({ employeeID, date: today });
+
+    if (!attendance) {
+      // Chưa có bản ghi điểm danh -> Check-in lần đầu
+      return checkIn({ body: { employeeID } }, res);
     } else {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid action. Use 'check-in' or 'check-out'",
-      });
+      // Nếu đã có bản ghi, thực hiện Check-out hoặc cập nhật Check-out mới nhất
+      return checkOut({ body: { employeeID } }, res);
     }
   } catch (error) {
     console.error("QR Scan error:", error);
@@ -581,6 +614,7 @@ const scanQRCode = async (req, res) => {
     });
   }
 };
+
 module.exports = {
   login,
   forgotPassword,
