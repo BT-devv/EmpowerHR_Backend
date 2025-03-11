@@ -9,31 +9,33 @@ const checkIn = async (req, res) => {
   try {
     const user = await User.findOne({ employeeID });
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Employee not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found",
+      });
     }
 
-    const today = moment()
-      .tz("Asia/Ho_Chi_Minh")
-      .startOf("day")
-      .format("YYYY-MM-DD");
+    const today = moment().tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DD");
     let attendance = await Attendance.findOne({ employeeID, date: today });
 
     if (attendance) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Already checked in for today" });
+      // Nếu đã có bản ghi trong ngày nhưng chưa check-in, cập nhật check-in
+      if (!attendance.checkIn) {
+        attendance.checkIn = checkInTime;
+        attendance.status = "Work from office";
+        await attendance.save();
+      }
+    } else {
+      // Nếu chưa có bản ghi -> Tạo mới
+      attendance = new Attendance({
+        employeeID,
+        name: `${user.firstName} ${user.lastName}`,
+        date: today,
+        checkIn: checkInTime,
+        status: "Work from office",
+      });
+      await attendance.save();
     }
-
-    attendance = new Attendance({
-      employeeID,
-      name: `${user.firstName} ${user.lastName}`,
-      date: today,
-      checkIn: checkInTime,
-    });
-
-    await attendance.save();
 
     res.status(200).json({
       success: true,
@@ -102,8 +104,8 @@ const checkOut = async (req, res) => {
         Math.max(0, workingMinutes)
       );
       attendance.timeOff = formatMinutesToTime(480 - workingMinutes);
-      attendance.status =
-        checkInMinutes > capacityStart + 30 ? "late" : "Work from office";
+      //attendance.status =
+      //checkInMinutes > capacityStart + 30 ? "late" : "Work from office";
     } else {
       attendance.status = "absent";
       attendance.workingHours = "0m";
@@ -146,7 +148,33 @@ function formatMinutesToTime(minutes) {
     : `${remainingMinutes}m`;
 }
 
+const getListAttendances = async (req, res) => {
+  try {
+    const { employeeID, date } = req.query;
+
+    let filter = {};
+    if (employeeID) filter.employeeID = employeeID;
+    if (date) filter.date = date;
+
+    const attendances = await Attendance.find(filter).sort({ date: -1 });
+
+    res.status(200).json({
+      success: true,
+      message: "Attendance list retrieved successfully",
+      data: attendances,
+    });
+  } catch (error) {
+    console.error("Get attendance list error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error retrieving attendance list",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   checkIn,
   checkOut,
+  getListAttendances,
 };

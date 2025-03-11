@@ -1,18 +1,30 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
+const BlacklistedToken = require("../models/blacklistedToken");
 
-const authMiddleware = (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-        return res.status(401).json({ success: false, message: 'Access denied. No token provided.' });
+const authMiddleware = async (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Access denied. No token provided." });
+  }
+
+  try {
+    // Kiểm tra token có bị blacklist không
+    const blacklisted = await BlacklistedToken.findOne({ token });
+    if (blacklisted) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Token is invalid or expired." });
     }
 
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded; // Lưu thông tin user vào request
-        next();
-    } catch (error) {
-        res.status(400).json({ success: false, message: 'Invalid token.' });
-    }
+    // Xác thực token hợp lệ
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(400).json({ success: false, message: "Invalid token." });
+  }
 };
 
 module.exports = authMiddleware;

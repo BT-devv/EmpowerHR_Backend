@@ -10,6 +10,7 @@ const { checkIn, checkOut } = require("./attendanceController");
 const { use } = require("../routes/absenceRoutes");
 const { text } = require("body-parser");
 const otpStore = new Map(); // Lưu OTP tạm thời
+const BlacklistedToken = require("../models/blacklistedToken");
 
 const login = async (req, res) => {
   const { emailCompany, password } = req.body;
@@ -70,6 +71,32 @@ const login = async (req, res) => {
     });
   }
 };
+
+const logout = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No token provided." });
+    }
+
+    // Lưu token vào danh sách blacklist
+    await BlacklistedToken.create({ token });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Logged out successfully." });
+  } catch (error) {
+    console.error("Logout Error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Error logging out, please try again later.",
+    });
+  }
+};
+
+module.exports = logout;
 
 const forgotPassword = async (req, res) => {
   const { emailCompany } = req.body;
@@ -609,19 +636,27 @@ const scanQRCode = async (req, res) => {
     }
 
     const employeeID = qrData.EmployeeID;
-    const today = moment()
-      .tz("Asia/Ho_Chi_Minh")
-      .startOf("day")
-      .format("YYYY-MM-DD");
+    const today = moment().tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DD");
 
     // Kiểm tra trạng thái điểm danh hôm nay
     let attendance = await Attendance.findOne({ employeeID, date: today });
 
     if (!attendance) {
-      // Chưa có bản ghi điểm danh -> Check-in lần đầu
+      return res.status(404).json({
+        success: false,
+        message: "Attendance record not found for today",
+      });
+    }
+
+    if (!attendance.checkIn) {
+      // Chưa check-in -> Ghi nhận check-in & đổi status
+      attendance.checkIn = moment().tz("Asia/Ho_Chi_Minh").format("HH:mm:ss");
+      attendance.status = "Work from office";
+      await attendance.save();
+
       return checkIn({ body: { employeeID } }, res);
     } else {
-      // Nếu đã có bản ghi, thực hiện Check-out hoặc cập nhật Check-out mới nhất
+      // Đã check-in -> Gọi check-out
       return checkOut({ body: { employeeID } }, res);
     }
   } catch (error) {
@@ -636,6 +671,7 @@ const scanQRCode = async (req, res) => {
 
 module.exports = {
   login,
+  logout,
   forgotPassword,
   verifyOTP,
   resetPassword,
