@@ -44,7 +44,7 @@ const absenceSchema = new mongoose.Schema({
     enum: ["Pending", "Approved", "Rejected"],
     default: "Pending",
   },
-  approvedBy: {
+  managerID: {
     type: String,
   },
   rejectReason: {

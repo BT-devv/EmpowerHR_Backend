@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Attendance = require("../models/attendance");
+
 const moment = require("moment-timezone");
 const crypto = require("crypto");
 const QRCode = require("qrcode");
