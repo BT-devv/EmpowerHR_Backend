@@ -6,28 +6,38 @@ const absenceSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  type: {
+  name: {
     type: String,
-    enum: ["Full Day", "Half Day", "Remote", "Leave Desk"],
     required: true,
   },
-  date: {
+  type: {
+    type: String,
+    enum: ["Full Day", "Half Day", "Leave Desk"],
+    required: true,
+  },
+  dateFrom: {
     type: Date,
     required: true,
   },
-  halfDaySession: {
-    type: String,
-    enum: ["Morning", "Afternoon"],
-    required: function () {
-      return this.type === "Half Day";
-    },
+  dateTo: {
+    type: Date,
+    required: true,
   },
+  lineManagers: [
+    {
+      type: String,
+      required: true,
+    },
+  ], // Quản lý phụ trách (1 hoặc nhiều)
+  // Lưu dạng mảng
+  teammates: [
+    {
+      type: String,
+    },
+  ],
   reason: {
     type: String,
     require: true,
-  },
-  teammate: {
-    type: String,
   },
   status: {
     type: String,
@@ -36,11 +46,30 @@ const absenceSchema = new mongoose.Schema({
   },
   managerID: {
     type: String,
-    require: true,
+  },
+  rejectReason: {
+    type: String,
+    validate: {
+      validator: function (value) {
+        return (
+          this.status !== "Rejected" || (this.status === "Rejected" && value)
+        );
+      },
+      message:
+        "Lý do từ chối (rejectReason) là bắt buộc nếu trạng thái là 'Rejected'.",
+    },
   },
   createdAt: {
     type: Date,
-    default: Date.now,
+    default: () => moment().tz("Asia/Ho_Chi_Minh").toDate(),
+  },
+  updatedAt: {
+    type: Date,
+    default: () => moment().tz("Asia/Ho_Chi_Minh").toDate(),
+  },
+  remainingDays: {
+    type: Number,
+    default: 0,
   },
 });
 

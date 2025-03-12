@@ -1,36 +1,12 @@
-const mongoose = require("mongoose");
 const Absence = require("../models/absence");
 const User = require("../models/User");
 const moment = require("moment-timezone");
-const nodemailer = require("nodemailer");
+const authenticateToken = require("../middlewares/authMiddleware");
 
-// Cấu hình SMTP để gửi email
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "lupinnguyen1811@gmail.com", // Thay bằng email của bạn
-    pass: "owdn vxar raqc vznv", // Thay bằng mật khẩu ứng dụng (App Password)
-  },
-});
-
-// Hàm gửi email
-const sendEmail = async (to, subject, text) => {
-  try {
-    await transporter.sendMail({
-      from: "lupinnguyen1811@gmail.com",
-      to,
-      subject,
-      text,
-    });
-  } catch (error) {
-    console.error("Email sending error:", error);
-  }
-};
-
-// 📝 Employee gửi yêu cầu nghỉ phép
+// 📝 Gửi yêu cầu nghỉ phép
 const requestAbsence = async (req, res) => {
-  const { type, date, halfDaySession, reason, teammate, managerID } = req.body;
-  const employeeID = req.user.employeeID; // Lấy employeeID từ token
+  const { type, dateFrom, dateTo, lineManagers, reason } = req.body;
+  const employeeID = req.user.employeeID;
 
   try {
     const employee = await User.findOne({ employeeID });
@@ -40,48 +16,78 @@ const requestAbsence = async (req, res) => {
         .json({ success: false, message: "Nhân viên không tồn tại." });
     }
 
-    const manager = await User.findOne({ employeeID: managerID });
-    if (!manager) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Manager không tồn tại." });
+    const currentDate = moment().tz("Asia/Ho_Chi_Minh");
+    const absenceStart = moment(dateFrom).tz("Asia/Ho_Chi_Minh");
+    const absenceEnd = moment(dateTo).tz("Asia/Ho_Chi_Minh");
+
+    // Kiểm tra ngày không được trong quá khứ
+    if (absenceStart.isBefore(currentDate, "day")) {
+      return res.status(400).json({
+        success: false,
+        message: "Không thể gửi yêu cầu nghỉ cho ngày trong quá khứ.",
+      });
     }
 
-    if (type === "Full Day" || type === "Half Day") {
-      if (employee.accumulatedLeaveDays <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Bạn đã hết số ngày nghỉ, nghỉ thêm sẽ bị trừ lương!",
-        });
-      }
-      employee.accumulatedLeaveDays -= type === "Full Day" ? 1 : 0.5;
-      await employee.save();
+    // Ngày kết thúc không được trước ngày bắt đầu
+    if (absenceEnd.isBefore(absenceStart, "day")) {
+      return res.status(400).json({
+        success: false,
+        message: "Ngày kết thúc không thể trước ngày bắt đầu.",
+      });
     }
 
-    // Lưu vào DB
+    // Không cho phép nghỉ vào Thứ 7 hoặc Chủ nhật
+    if (
+      [6, 7].includes(absenceStart.isoWeekday()) ||
+      [6, 7].includes(absenceEnd.isoWeekday())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Không thể gửi yêu cầu nghỉ vào Thứ 7 hoặc Chủ nhật.",
+      });
+    }
+
+    // Yêu cầu nghỉ Full Day phải xin trước ít nhất 1 ngày
+    if (
+      type === "Full Day" &&
+      absenceStart.isSameOrBefore(currentDate, "day")
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Yêu cầu nghỉ Full Day phải được gửi trước ít nhất 1 ngày.",
+      });
+    }
+
+    // Kiểm tra số ngày nghỉ tích lũy
+    const leaveDays = absenceEnd.diff(absenceStart, "days") + 1;
+    if (employee.accumulatedLeaveDays < leaveDays) {
+      return res.status(400).json({
+        success: false,
+        message: "Bạn đã hết số ngày nghỉ, nghỉ thêm sẽ bị trừ lương!",
+      });
+    }
+    employee.accumulatedLeaveDays -= leaveDays;
+    await employee.save();
+
+    // Tạo yêu cầu nghỉ phép
     const absenceRequest = new Absence({
       employeeID,
+      name: `${employee.firstName}${employee.lastName}`,
       type,
-      date,
-      halfDaySession,
+      dateFrom,
+      dateTo,
+      lineManagers,
       reason,
-      teammate,
-      managerID,
       status: "Pending",
+      createdAt: moment().tz("Asia/Ho_Chi_Minh").toDate(),
+      updatedAt: moment().tz("Asia/Ho_Chi_Minh").toDate(),
     });
 
     await absenceRequest.save();
 
-    // Gửi email cho Manager
-    await sendEmail(
-      manager.emailCompany,
-      "New Absence Request",
-      `You have a new absence request from ${employee.firstName} ${employee.lastName}.\n\nType: ${type}\nDate: ${date}\nReason: ${reason}`
-    );
-
     res.status(201).json({
       success: true,
-      message: "Đã gửi yêu cầu nghỉ và thông báo đến Manager!",
+      message: "Đã gửi yêu cầu nghỉ!",
       absence: absenceRequest,
     });
   } catch (error) {
@@ -92,10 +98,9 @@ const requestAbsence = async (req, res) => {
   }
 };
 
-// ✅ Manager phê duyệt hoặc từ chối yêu cầu nghỉ phép
 const approveAbsence = async (req, res) => {
-  const { absenceID, status } = req.body;
-  const managerID = req.user.employeeID; // Lấy managerID từ token
+  const { absenceID, status, rejectReason } = req.body;
+  const approvedBy = req.user.employeeID; // Lấy ID người duyệt từ token
 
   try {
     const absence = await Absence.findById(absenceID);
@@ -105,54 +110,97 @@ const approveAbsence = async (req, res) => {
         .json({ success: false, message: "Đơn nghỉ không tồn tại." });
     }
 
-    if (absence.status !== "Pending") {
-      return res
-        .status(400)
-        .json({ success: false, message: "Đơn nghỉ đã được xử lý trước đó." });
-    }
-
-    // Kiểm tra managerID có trùng với managerID trong request không
-    if (absence.managerID !== managerID) {
+    // Kiểm tra xem người duyệt có phải là Line Manager không
+    if (!absence.lineManagers.includes(approvedBy)) {
       return res.status(403).json({
         success: false,
-        message: "Bạn không có quyền xử lý đơn nghỉ này.",
+        message: "Bạn không có quyền duyệt đơn này.",
       });
     }
 
-    absence.status = status;
-    absence.approvedBy = managerID;
-    await absence.save();
-
-    // Lấy thông tin employee để gửi email phản hồi
-    const employee = await User.findOne({ employeeID: absence.employeeID });
-    if (!employee) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Nhân viên không tồn tại." });
+    // Kiểm tra nếu đơn đã được xử lý trước đó
+    if (absence.status !== "Pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Đơn nghỉ đã được xử lý trước đó.",
+      });
     }
 
-    // Gửi email cho nhân viên
-    await sendEmail(
-      employee.emailCompany,
-      "Absence Request Update",
-      `Your absence request has been ${status.toLowerCase()} by your manager.`
-    );
+    // Kiểm tra nếu từ chối mà không có lý do
+    if (status === "Rejected" && !rejectReason) {
+      return res.status(400).json({
+        success: false,
+        message: "Cần nhập lý do từ chối.",
+      });
+    }
+
+    // Cập nhật trạng thái, người duyệt và thời gian cập nhật
+    absence.status = status;
+    absence.approvedBy = approvedBy;
+    absence.updatedAt = moment().tz("Asia/Ho_Chi_Minh").toDate();
+
+    if (status === "Rejected") {
+      absence.rejectReason = rejectReason;
+    }
+
+    await absence.save();
 
     res.status(200).json({
       success: true,
-      message: `Đã ${
-        status === "Approved" ? "duyệt" : "từ chối"
-      } đơn nghỉ và thông báo đến nhân viên.`,
+      message: `Đã ${status === "Approved" ? "duyệt" : "từ chối"} đơn nghỉ.`,
+      absence,
     });
   } catch (error) {
     console.error("Lỗi khi duyệt đơn nghỉ:", error.message);
-    res
-      .status(500)
-      .json({ success: false, message: "Lỗi hệ thống.", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Lỗi hệ thống.",
+      error: error.message,
+    });
+  }
+};
+const getPendingAbsences = async (req, res) => {
+  try {
+    const pendingAbsences = await Absence.find({ status: "Pending" });
+
+    res.status(200).json({
+      success: true,
+      message: "Danh sách đơn nghỉ phép đang chờ duyệt.",
+      absences: pendingAbsences,
+    });
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách đơn nghỉ phép:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi hệ thống.",
+      error: error.message,
+    });
+  }
+};
+const getAbsencesHistory = async (req, res) => {
+  try {
+    const processedAbsences = await Absence.find({
+      status: { $ne: "Pending" },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Danh sách đơn nghỉ phép đã xử lý.",
+      absences: processedAbsences,
+    });
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách đơn nghỉ phép:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi hệ thống.",
+      error: error.message,
+    });
   }
 };
 
 module.exports = {
   requestAbsence,
   approveAbsence,
+  getAbsencesHistory,
+  getPendingAbsences,
 };

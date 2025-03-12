@@ -4,6 +4,7 @@ const morgan = require("morgan");
 const cors = require("cors"); // Import CORS middleware
 const { connectDB } = require("./config/db.js");
 const routes = require("./routes/index.js");
+const createDailyAttendanceRecords = require("./cronJobs.js"); // Import cron job
 
 require("dotenv").config();
 
@@ -34,6 +35,9 @@ app.use("/api", routes);
 app.get("/", (req, res) => {
   res.send("🚀 Server đang chạy!");
 });
+
+// Khởi động cron job để cập nhật chấm công hằng ngày
+createDailyAttendanceRecords();
 
 // Khởi động server
 const PORT = process.env.PORT || 3000;

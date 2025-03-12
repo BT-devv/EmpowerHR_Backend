@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {
   login,
+  logout,
   forgotPassword,
   verifyOTP,
   resetPassword,
@@ -29,6 +30,7 @@ router.post("/verify-otp", verifyOTP);
 router.get("/search", searchUsers);
 router.put("/:id", updateUser); // Update User
 router.post("/login", login);
+router.post("/logout", logout);
 router.get("/users", getAllUsers);
 router.get("/:id", getUserById);
 router.delete("/:id", deleteUser);
