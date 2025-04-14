@@ -1,15 +1,14 @@
-// routes/attendanceRoutes.js
-const express = require("express");
-const router = express.Router();
+const secureRouter = require("../utils/secureRouter");
+const router = secureRouter();
 const {
   checkIn,
   checkOut,
   getListAttendances,
 } = require("../controllers/attendanceController");
-
+const authMiddleware = require("../middlewares/authMiddleware");
 router.post("/check-in", checkIn); // Endpoint check-in
 router.post("/check-out", checkOut); // Endpoint check-out
-router.get("/", getListAttendances);
+router.secureGet("/", "attendance.read", authMiddleware, getListAttendances);
 /* 
 GET http://localhost:5000/api/attendance(full danh sách)
 GET http://localhost:5000/api/attendance/?employeeID=EMP-2500001 (lọc theo EmployeeID)
