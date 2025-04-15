@@ -1,8 +1,7 @@
 const { MongoClient, ObjectId, GridFSBucket } = require("mongodb");
 
-const mongoUri =
-  process.env.MONGO_URI ||
-  "mongodb+srv://buitrungtuan2003:MAYUACcodVSkjY4E@cluster0.5qgwu.mongodb.net/test";
+require("dotenv").config();
+const mongoUri = process.env.MONGO_URI;
 
 const dbName = mongoUri.split("/").pop(); // "empowerhr"
 
