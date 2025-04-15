@@ -1,5 +1,5 @@
-const express = require("express");
-const router = express.Router();
+const secureRouter = require("../utils/secureRouter");
+const router = secureRouter();
 const {
   requestOvertime,
   updateOvertimeStatus,
@@ -8,8 +8,28 @@ const {
 } = require("../controllers/overtimeController");
 const authMiddleware = require("../middlewares/authMiddleware");
 
-router.post("/request", authMiddleware, requestOvertime);
-router.put("/update-status", authMiddleware, updateOvertimeStatus);
-router.get("/pending", getPendingOvertime);
-router.get("/history", getOvertimeHistory);
+router.securePost(
+  "/request",
+  "overtime.create",
+  authMiddleware,
+  requestOvertime
+);
+router.securePut(
+  "/update-status",
+  "overtime.update",
+  authMiddleware,
+  updateOvertimeStatus
+);
+router.secureGet(
+  "/pending",
+  "overtime.read",
+  authMiddleware,
+  getPendingOvertime
+);
+router.secureGet(
+  "/history",
+  "overtime.read",
+  authMiddleware,
+  getOvertimeHistory
+);
 module.exports = router;

@@ -5,6 +5,7 @@ const cors = require("cors"); // Import CORS middleware
 const { connectDB } = require("./config/db.js");
 const routes = require("./routes/index.js");
 const createDailyAttendanceRecords = require("./cronJobs.js"); // Import cron job
+const fileUpload = require("express-fileupload");
 
 require("dotenv").config();
 
@@ -27,6 +28,9 @@ connectDB();
 // Cấu hình Middleware
 app.use(express.json()); // Để parse JSON từ body của request
 app.use(express.urlencoded({ extended: true }));
+
+app.use(fileUpload());
+app.use(express.static("uploads")); // Nếu muốn truy cập ảnh tạm
 
 // Routes
 app.use("/api", routes);

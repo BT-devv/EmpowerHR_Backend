@@ -5,10 +5,6 @@ const bcrypt = require("bcryptjs"); // Giữ nguyên bcryptjs nếu bạn dùng 
 
 // Định nghĩa Schema
 const userSchema = new mongoose.Schema({
-  avatar: {
-    type: String, // Lưu đường dẫn đến ảnh
-    required: true,
-  },
   employeeID: {
     type: String,
     unique: true, // Đảm bảo là duy nhất
@@ -116,9 +112,8 @@ const userSchema = new mongoose.Schema({
     required: true,
   },
   role: {
-    type: String,
-    required: true,
-    enum: ["Admin", "Manager", "Employee"],
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Role",
   },
   startDate: {
     type: Date,
@@ -137,6 +132,26 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ["Active", "Inactive"],
     default: "Active", // Assuming default status is Active
+  },
+  avatar: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "fs.files",
+  },
+  photoID: {
+    type: mongoose.Schema.Types.ObjectId, // Ảnh giấy tờ tùy thân
+    ref: "fs.files",
+  },
+  certificate: {
+    type: mongoose.Schema.Types.ObjectId, // Chứng chỉ (PDF/Ảnh)
+    ref: "fs.files",
+  },
+  graduationCertificate: {
+    type: mongoose.Schema.Types.ObjectId, // Bằng cấp (PDF/Ảnh)
+    ref: "fs.files",
+  },
+  order: {
+    type: mongoose.Schema.Types.ObjectId, // Bằng cấp (PDF/Ảnh)
+    ref: "fs.files",
   },
 });
 

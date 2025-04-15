@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Attendance = require("../models/attendance");
-
+const Role = require("../models/Role");
 const moment = require("moment-timezone");
 const crypto = require("crypto");
 const QRCode = require("qrcode");
@@ -50,6 +50,7 @@ const login = async (req, res) => {
     const token = jwt.sign(
       {
         userId: user._id,
+        _id: user._id,
         employeeID: user.employeeID,
         emailCompany: user.emailCompany,
       },
@@ -62,6 +63,7 @@ const login = async (req, res) => {
       message: "Login success!",
       token,
       userId: user._id, // Gửi userId về client
+      _id: user._id,
       employeeID: user.employeeID,
     });
   } catch (error) {
@@ -290,12 +292,16 @@ const createUser = async (req, res) => {
     department,
     jobTitle,
     employeeType,
-    role,
+    role: roleName,
     joiningDate,
     endDate,
     status,
   } = req.body;
-
+  // Tìm role theo tên
+  const roleDoc = await Role.findOne({ name: roleName });
+  if (!roleDoc) {
+    return res.status(400).json({ message: "Vai trò không tồn tại!" });
+  }
   try {
     console.log("📧 Debug: emailCompany nhận được:", emailCompany);
 
@@ -333,7 +339,7 @@ const createUser = async (req, res) => {
       department,
       jobTitle,
       employeeType,
-      role,
+      role: roleDoc._id,
       joiningDate,
       endDate,
       status,
