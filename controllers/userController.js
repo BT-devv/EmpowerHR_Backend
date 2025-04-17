@@ -53,6 +53,7 @@ const login = async (req, res) => {
         _id: user._id,
         employeeID: user.employeeID,
         emailCompany: user.emailCompany,
+        role: user.role,
       },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
@@ -65,6 +66,8 @@ const login = async (req, res) => {
       userId: user._id, // Gửi userId về client
       _id: user._id,
       employeeID: user.employeeID,
+      emailCompany: user.emailCompany,
+      role: user.role,
     });
   } catch (error) {
     console.error("Error Login:", error.message);
