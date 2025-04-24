@@ -1,4 +1,4 @@
-const Overtime = require("../models/overtime");
+const Overtime = require("../models/Overtime");
 const User = require("../models/User");
 const moment = require("moment-timezone");
 
@@ -80,6 +80,22 @@ const requestOvertime = async (req, res) => {
 
     // Tính số giờ OT
     const duration = endDateTime.diff(startDateTime, "hours", true);
+    // Giới hạn số giờ OT cho ngày thường là 4h và cuối tuần là 12h
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+      if (duration > 4) {
+        return res.status(400).json({
+          success: false,
+          message: "Số giờ OT vào ngày thường không được vượt quá 4 tiếng.",
+        });
+      }
+    } else {
+      if (duration > 12) {
+        return res.status(400).json({
+          success: false,
+          message: "Số giờ OT vào cuối tuần không được vượt quá 12 tiếng.",
+        });
+      }
+    }
 
     // Lưu vào database
     const overtime = new Overtime({

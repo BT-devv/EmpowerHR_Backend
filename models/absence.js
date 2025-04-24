@@ -12,7 +12,7 @@ const absenceSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["Full Day", "Half Day", "Leave Desk"],
+    enum: ["Full Day", "Half Day", "Leave Desk", "Remote"],
     required: true,
   },
   dateFrom: {

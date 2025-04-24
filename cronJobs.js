@@ -2,7 +2,7 @@ const cron = require("node-cron");
 const moment = require("moment-timezone");
 const mongoose = require("mongoose");
 require("dotenv").config();
-const Attendance = require("./models/attendance");
+const Attendance = require("./models/Attendance");
 const User = require("./models/User");
 
 // Kết nối MongoDB

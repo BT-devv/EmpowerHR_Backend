@@ -1,4 +1,4 @@
-const Attendance = require("../models/attendance");
+const Attendance = require("../models/Attendance");
 const User = require("../models/User");
 const moment = require("moment-timezone");
 

@@ -6,7 +6,7 @@ const { connectDB } = require("./config/db.js");
 const routes = require("./routes/index.js");
 const createDailyAttendanceRecords = require("./cronJobs.js"); // Import cron job
 const fileUpload = require("express-fileupload");
-
+const { initWebSocket } = require("./sockets/socketManager");
 require("dotenv").config();
 
 // Tạo ứng dụng Express
@@ -43,8 +43,14 @@ app.get("/", (req, res) => {
 // Khởi động cron job để cập nhật chấm công hằng ngày
 createDailyAttendanceRecords();
 
-// Khởi động server
+const http = require("http");
+const server = http.createServer(app);
+
+// Khởi động HTTP server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🌐 Server running on port: ${PORT}`);
 });
+
+// Khởi động WebSocket
+initWebSocket(server);

@@ -1,5 +1,5 @@
 const Role = require("../models/Role");
-const Permission = require("../models/permission");
+const Permission = require("../models/Permission");
 
 // Create
 const createPermission = async (req, res) => {

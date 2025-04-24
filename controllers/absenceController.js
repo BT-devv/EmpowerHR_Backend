@@ -1,4 +1,4 @@
-const Absence = require("../models/absence");
+const Absence = require("../models/Absence");
 const User = require("../models/User");
 const moment = require("moment-timezone");
 const authenticateToken = require("../middlewares/authMiddleware");
