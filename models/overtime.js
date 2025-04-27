@@ -35,6 +35,11 @@ const OvertimeSchema = new mongoose.Schema({
         "Lý do từ chối (rejectReason) là bắt buộc nếu trạng thái là 'Rejected'.",
     },
   },
+  workingDayType: {
+    type: String,
+    enum: ["holiday", "weekend", "weekday"],
+    required: true,
+  },
 });
 
 module.exports = mongoose.model("Overtime", OvertimeSchema);

@@ -30,10 +30,10 @@ const getRoles = async (req, res) => {
 // Update
 const updatedRole = async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name } = req.body;
     const role = await Role.findByIdAndUpdate(
       req.params.id,
-      { name, description },
+      { name },
       { new: true }
     );
     if (!role) return res.status(404).json({ message: "Role not found" });

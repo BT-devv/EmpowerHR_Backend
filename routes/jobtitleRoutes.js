@@ -4,6 +4,7 @@ const {
   deleteJobtitle,
   updatedJobtitle,
   getAllJobtitle,
+  assignJobtitle,
 } = require("../controllers/jobtitleController");
 const authenticateUser = require("../middlewares/authMiddleware");
 
@@ -13,5 +14,6 @@ router.post("/", createJobtitle);
 router.get("/", getAllJobtitle);
 router.put("/:id", updatedJobtitle);
 router.delete("/:id", deleteJobtitle);
+router.post("/assign-jobtitle", assignJobtitle);
 
 module.exports = router;

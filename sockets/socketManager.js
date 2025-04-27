@@ -30,14 +30,15 @@ function initWebSocket(server) {
   });
 }
 
-// Gửi thông báo
-const sendPayrollNotification = (employeeID, message) => {
+// Gửi thông báo chung cho tất cả loại thông báo
+const sendNotification = (employeeID, notificationType, message, data) => {
   const socket = clients.get(employeeID);
   if (socket && socket.readyState === 1) {
     socket.send(
       JSON.stringify({
-        type: "payroll_notification",
-        message,
+        type: notificationType, // Loại thông báo (ví dụ: Absence, Overtime, payroll)
+        message: message, // Nội dung thông báo
+        data: data, // Dữ liệu thêm nếu có (ví dụ: thông tin về đơn nghỉ phép hoặc OT)
       })
     );
   } else {
@@ -47,5 +48,5 @@ const sendPayrollNotification = (employeeID, message) => {
 
 module.exports = {
   initWebSocket,
-  sendPayrollNotification,
+  sendNotification,
 };

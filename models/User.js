@@ -153,6 +153,10 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId, // Bằng cấp (PDF/Ảnh)
     ref: "fs.files",
   },
+  remainingDays: {
+    type: Number,
+    default: 0,
+  },
 });
 
 // Tự động tạo Employee ID

@@ -54,6 +54,8 @@ const login = async (req, res) => {
         employeeID: user.employeeID,
         emailCompany: user.emailCompany,
         role: user.role,
+        lastName: user.lastName,
+        firstName: user.firstName,
       },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
@@ -68,6 +70,8 @@ const login = async (req, res) => {
       employeeID: user.employeeID,
       emailCompany: user.emailCompany,
       role: user.role,
+      lastName: user.lastName,
+      firstName: user.firstName,
     });
   } catch (error) {
     console.error("Error Login:", error.message);
@@ -274,7 +278,6 @@ const sendEmail = async (emailCompany, subject, text) => {
 
 const createUser = async (req, res) => {
   const {
-    avatar,
     firstName,
     lastName,
     alias,
@@ -321,7 +324,6 @@ const createUser = async (req, res) => {
 
     // Tạo user mới
     const newUser = new User({
-      avatar,
       firstName,
       lastName,
       alias,
@@ -397,7 +399,6 @@ Phòng Hành Chính - Nhân Sự
 const updateUser = async (req, res) => {
   const { id } = req.params;
   const {
-    avatar,
     firstName,
     lastName,
     alias,
@@ -450,7 +451,7 @@ const updateUser = async (req, res) => {
     }
 
     // Cập nhật thông tin người dùng
-    user.avatar = avatar || user.avatar;
+
     user.firstName = firstName || user.firstName;
     user.alias = alias || user.alias;
     user.lastName = lastName || user.lastName;

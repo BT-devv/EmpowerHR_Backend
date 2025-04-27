@@ -3,7 +3,7 @@ const Attendance = require("../models/Attendance");
 const Absence = require("../models/Absence");
 const Overtime = require("../models/Overtime");
 const Payroll = require("../models/Payroll");
-const { sendPayrollNotification } = require("../sockets/socketManager");
+const { sendNotification } = require("../sockets/socketManager");
 
 const moment = require("moment");
 
@@ -186,8 +186,9 @@ const createPayroll = async (req, res) => {
     }
 
     res.status(201).json(payroll);
-    sendPayrollNotification(
+    sendNotification(
       employeeID,
+      "Payroll Notification",
       `Lương tháng ${month}/${year} đã có: ${calculated.netSalary.toLocaleString()} VND`
     );
   } catch (error) {
