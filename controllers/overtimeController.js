@@ -1,5 +1,7 @@
-const Overtime = require("../models/overtime");
+const Overtime = require("../models/Overtime");
 const User = require("../models/User");
+const Holiday = require("../models/Holiday");
+const { sendNotification } = require("../sockets/socketManager");
 const moment = require("moment-timezone");
 
 //Nhân viên gửi request OT
@@ -8,7 +10,6 @@ const requestOvertime = async (req, res) => {
     const employeeID = req.user.employeeID;
     const { projectManager, date, startTime, endTime, reason } = req.body;
 
-    // Kiểm tra đầu vào
     if (!projectManager || !date || !startTime || !endTime || !reason) {
       return res.status(400).json({
         success: false,
@@ -17,7 +18,6 @@ const requestOvertime = async (req, res) => {
       });
     }
 
-    // Tìm nhân viên theo employeeID
     const user = await User.findOne({ employeeID });
     if (!user) {
       return res
@@ -25,14 +25,10 @@ const requestOvertime = async (req, res) => {
         .json({ success: false, message: "Nhân viên không tồn tại." });
     }
 
-    // Lấy thời gian hiện tại
     const now = moment().tz("Asia/Ho_Chi_Minh");
     const today = now.clone().startOf("day");
+    const requestDate = moment(date, "YYYY-MM-DD");
 
-    // Chuyển đổi ngày yêu cầu OT
-    const requestDate = moment(date, "YYYY-MM-DD").tz("Asia/Ho_Chi_Minh");
-
-    // Kiểm tra ngày không được là quá khứ
     if (requestDate.isBefore(today)) {
       return res.status(400).json({
         success: false,
@@ -40,7 +36,6 @@ const requestOvertime = async (req, res) => {
       });
     }
 
-    // Chuyển đổi startTime và endTime thành đối tượng moment
     const startDateTime = moment(`${date} ${startTime}`, "YYYY-MM-DD HH:mm").tz(
       "Asia/Ho_Chi_Minh"
     );
@@ -48,7 +43,6 @@ const requestOvertime = async (req, res) => {
       "Asia/Ho_Chi_Minh"
     );
 
-    // Kiểm tra thời gian OT không được trong quá khứ
     if (startDateTime.isBefore(now)) {
       return res.status(400).json({
         success: false,
@@ -56,17 +50,51 @@ const requestOvertime = async (req, res) => {
       });
     }
 
-    // Kiểm tra endTime phải sau startTime
     if (!endDateTime.isAfter(startDateTime)) {
       return res.status(400).json({
         success: false,
         message: "Thời gian kết thúc OT phải sau thời gian bắt đầu.",
       });
     }
+    // Kiểm tra xem đã có đơn OT nào Pending hoặc Approved cùng ngày chưa
+    const existingOT = await Overtime.findOne({
+      employeeID,
+      date,
+      status: { $in: ["Pending", "Approved"] },
+    });
 
-    // Chỉ cho phép OT sau 17:30 vào các ngày trong tuần (Thứ 2 - Thứ 6)
-    const dayOfWeek = requestDate.isoWeekday();
-    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+    if (existingOT) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Đã có yêu cầu OT cho ngày này đang Pending hoặc Approved. Không thể gửi thêm.",
+      });
+    }
+    // Kiểm tra ngày đó có phải ngày lễ (holiday)
+    let workingDayType = "weekday"; // mặc định là ngày thường
+
+    const holiday = await Holiday.findOne({
+      startDate: { $lte: requestDate.clone().endOf("day").toDate() },
+      endDate: { $gte: requestDate.clone().startOf("day").toDate() },
+    });
+
+    if (holiday) {
+      workingDayType = "holiday";
+    } else {
+      const dayOfWeek = requestDate.isoWeekday();
+      if (dayOfWeek === 6 || dayOfWeek === 7) {
+        workingDayType = "weekend";
+      }
+    }
+    console.log("workingDayType:", workingDayType);
+    console.log("Holiday Start - End:", holiday?.startDate, holiday?.endDate);
+    console.log(
+      "Request Date:",
+      requestDate.clone().startOf("day").utc().toDate()
+    );
+
+    // Nếu là ngày thường thì chỉ cho OT sau 17:30
+    if (workingDayType === "weekday") {
       const allowedStartTime = moment(`${date} 17:30`, "YYYY-MM-DD HH:mm").tz(
         "Asia/Ho_Chi_Minh"
       );
@@ -81,7 +109,24 @@ const requestOvertime = async (req, res) => {
     // Tính số giờ OT
     const duration = endDateTime.diff(startDateTime, "hours", true);
 
-    // Lưu vào database
+    // Kiểm tra giới hạn số giờ OT
+    if (workingDayType === "holiday" || workingDayType === "weekend") {
+      if (duration > 12) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Số giờ OT vào ngày lễ hoặc cuối tuần không được vượt quá 12 tiếng.",
+        });
+      }
+    } else {
+      if (duration > 4) {
+        return res.status(400).json({
+          success: false,
+          message: "Số giờ OT vào ngày thường không được vượt quá 4 tiếng.",
+        });
+      }
+    }
+
     const overtime = new Overtime({
       employeeID,
       name: `${user.firstName} ${user.lastName}`,
@@ -91,6 +136,7 @@ const requestOvertime = async (req, res) => {
       endTime,
       duration,
       reason,
+      workingDayType,
       status: "Pending",
       createdAt: now.toDate(),
       updatedAt: now.toDate(),
@@ -103,6 +149,12 @@ const requestOvertime = async (req, res) => {
       message: "Yêu cầu OT đã được gửi.",
       data: overtime,
     });
+    // Gửi thông báo cho Line Manager khi có yêu cầu OT mới
+    sendNotification(
+      projectManager,
+      "Overtime Request",
+      `Yêu cầu OT mới từ ${user.firstName} ${user.lastName} đang chờ duyệt`
+    );
   } catch (error) {
     console.error("Lỗi khi gửi yêu cầu OT:", error);
     res.status(500).json({
@@ -156,7 +208,7 @@ const updateOvertimeStatus = async (req, res) => {
     // Cập nhật trạng thái, thời gian cập nhật, người duyệt
     overtime.status = status;
     overtime.updatedAt = moment().tz("Asia/Ho_Chi_Minh").toDate();
-    overtime.approveBy = managerName;
+    overtime.approveBy = req.user.employeeID;
 
     // Nếu bị từ chối, cập nhật lý do từ chối
     if (status === "Rejected") {
@@ -170,6 +222,14 @@ const updateOvertimeStatus = async (req, res) => {
       message: `Overtime ${status.toLowerCase()}`,
       data: overtime,
     });
+    // Gửi thông báo cho Employee khi có cập nhật trạng thái OT
+    sendNotification(
+      overtime.employeeID,
+      "Overtime Status Update",
+      `Yêu cầu OT của bạn đã được ${status.toLowerCase()}${
+        status === "Rejected" ? ` - Lý do: ${rejectReason}` : ""
+      }`
+    );
   } catch (error) {
     console.error("Update overtime error:", error);
     res.status(500).json({

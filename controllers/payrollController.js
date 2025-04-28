@@ -1,150 +1,253 @@
 const User = require("../models/User");
-const Attendance = require("../models/attendance");
-const Absence = require("../models/absence");
-const Overtime = require("../models/overtime");
-const Payroll = require("../models/payroll");
-const jwt = require("jsonwebtoken");
+const Attendance = require("../models/Attendance");
+const Absence = require("../models/Absence");
+const Overtime = require("../models/Overtime");
+const Payroll = require("../models/Payroll");
+const { sendNotification } = require("../sockets/socketManager");
 
-const calculatePayroll = async (req, res) => {
+const moment = require("moment");
+
+// Helper tính các khoản
+const calculatePayroll = (data) => {
+  const {
+    baseSalary,
+    overtimeHours,
+    bonus = 0,
+    unpaidLeaveDays = 0,
+    salaryAdvance = 0,
+    salarySubtraction = 0,
+  } = data;
+
+  const workDay = 26;
+  const workHour = 8;
+  const hourlyRate = baseSalary / (workDay * workHour);
+  const overtimePay = overtimeHours * hourlyRate * 2;
+  const unpaidLeaveDeduction = (baseSalary / 26) * unpaidLeaveDays;
+  const insuranceDeduction = baseSalary * 0.105;
+
+  const totalIncome = baseSalary + overtimePay + bonus;
+  const personalDeduction = 4500000;
+  const taxableIncome = Math.max(
+    0,
+    totalIncome - insuranceDeduction - personalDeduction
+  );
+
+  const calculateTax = (income) => {
+    const brackets = [
+      { max: 5000000, rate: 0.05 },
+      { max: 10000000, rate: 0.1 },
+      { max: 18000000, rate: 0.15 },
+      { max: 32000000, rate: 0.2 },
+      { max: 52000000, rate: 0.25 },
+      { max: 80000000, rate: 0.3 },
+      { max: Infinity, rate: 0.35 },
+    ];
+
+    let remaining = income;
+    let tax = 0;
+    let prev = 0;
+
+    for (const b of brackets) {
+      const amount = Math.min(b.max - prev, remaining);
+      if (amount > 0) {
+        tax += amount * b.rate;
+        remaining -= amount;
+        prev = b.max;
+      }
+      if (remaining <= 0) break;
+    }
+    return tax;
+  };
+
+  const personalIncomeTax = calculateTax(taxableIncome);
+
+  const netSalary =
+    totalIncome -
+    unpaidLeaveDeduction -
+    insuranceDeduction -
+    personalIncomeTax -
+    salaryAdvance -
+    salarySubtraction;
+
+  return {
+    overtimePay,
+    unpaidLeaveDeduction,
+    insuranceDeduction,
+    personalIncomeTax,
+    totalIncome,
+    netSalary,
+  };
+};
+
+// CREATE
+const createPayroll = async (req, res) => {
   try {
-    // 🛠 Lấy Token từ Header và giải mã
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Token không hợp lệ" });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const employeeID = decoded.employeeID;
-
-    // 🏦 Lấy thông tin User từ bảng users
-    const user = await User.findOne({ employeeID: employeeID }).select(
-      "bankAccount idCardNumber role companyEmail department"
-    );
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Không tìm thấy nhân viên" });
-    }
-
-    // 📆 Xác định tháng và năm tính lương
     const {
+      employeeID,
       baseSalary,
+      bonus,
+      salaryAdvance,
+      salarySubtraction,
       month,
       year,
-      commission = 0,
-      kpiBonus = 0,
-      fine = 0,
     } = req.body;
-    const currentDate = new Date();
-    const payrollMonth = month || currentDate.getMonth() + 1;
-    const payrollYear = year || currentDate.getFullYear();
 
-    const startDate = new Date(payrollYear, payrollMonth - 1, 1);
-    const endDate = new Date(payrollYear, payrollMonth, 0, 23, 59, 59);
+    const startDate = moment({ year: year, month: month - 1, day: 1 });
 
-    // 📊 Lấy dữ liệu Attendance, Absence, Overtime
-    const actualWorkDays = await Attendance.countDocuments({
-      employeeID,
-      status: { $ne: "absent" },
-      date: { $gte: startDate, $lte: endDate },
-    });
+    const endDate = moment(startDate).endOf("month");
 
-    const leaveDaysPaid = await Absence.countDocuments({
-      employeeID,
-      type: "Full Day",
-      status: "Approved",
-      date: { $gte: startDate, $lte: endDate },
-    });
-
-    const otData = await Overtime.find({
+    // OT
+    const overtimeDocs = await Overtime.find({
       employeeID,
       status: "Approved",
-      date: { $gte: startDate, $lte: endDate },
+      date: { $gte: startDate.toDate(), $lte: endDate.toDate() },
     });
-    const otHours = otData.reduce((sum, ot) => sum + ot.duration, 0);
 
-    // 💰 Tính lương
-    const dailySalary = baseSalary / 26;
-    const salaryEarned = dailySalary * actualWorkDays;
-    const leaveSalary = dailySalary * leaveDaysPaid;
-    const otRate = 1.5;
-    const otSalary = otHours * (dailySalary / 8) * otRate;
-    const insurance = baseSalary * (0.08 + 0.015 + 0.01);
+    const overtimeHours = overtimeDocs.reduce(
+      (total, ot) => total + (ot.duration || 0),
+      0
+    );
 
-    let totalSalary = salaryEarned + leaveSalary + otSalary - insurance;
-
-    if (user.department === "MKT") {
-      totalSalary += commission;
-    } else if (user.department === "Sale") {
-      totalSalary += commission + kpiBonus;
-    }
-
-    totalSalary -= fine;
-
-    // 📌 Kiểm tra nếu đã có Payroll của tháng đó thì cập nhật
-    let payroll = await Payroll.findOne({
+    // Absence
+    const absenceDocs = await Absence.find({
       employeeID,
-      month: payrollMonth,
-      year: payrollYear,
+      status: "Approved",
+      date: { $gte: startDate.toDate(), $lte: endDate.toDate() },
     });
+
+    const compensatedHours = absenceDocs.reduce((total, ab) => {
+      if (["fullday", "remote"].includes(ab.type)) return total + 8;
+      if (ab.type === "halfday") return total + 4;
+      return total;
+    }, 0);
+
+    // Attendance
+    const attendanceDocs = await Attendance.find({
+      employeeID,
+      date: { $gte: startDate.toDate(), $lte: endDate.toDate() },
+    });
+
+    const workedHours = attendanceDocs.reduce(
+      (total, att) => total + (att.workingHours || 0),
+      0
+    );
+
+    const totalExpectedHours = 26 * 8;
+    const actualWorkedHours = workedHours + compensatedHours;
+    const missingHours = Math.max(0, totalExpectedHours - actualWorkedHours);
+    const unpaidLeaveDays = isNaN(missingHours) ? 0 : missingHours / 8;
+
+    // Tính lương
+    const calculated = calculatePayroll({
+      baseSalary,
+      overtimeHours,
+      bonus,
+      unpaidLeaveDays,
+      salaryAdvance,
+      salarySubtraction,
+    });
+
+    // Lấy thông tin nhân viên
+    const user = await User.findOne({ employeeID });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const employeeName = `${user.firstName} ${user.lastName}`;
+    const position = user.position || "";
+
+    // Kiểm tra xem đã có bảng lương chưa
+    let payroll = await Payroll.findOne({ employeeID, month, year });
+
+    const payrollData = {
+      employeeID,
+      employeeName,
+      position,
+      baseSalary,
+      bonus,
+      salaryAdvance,
+      salarySubtraction,
+      month,
+      year,
+      payDate: new Date(year, month - 1, 0), // ngày cuối tháng
+      unpaidLeave: unpaidLeaveDays,
+      otPay: calculated.overtimePay,
+      personalIncomeTax: calculated.personalIncomeTax,
+      total: calculated.totalIncome,
+      netSalary: calculated.netSalary,
+    };
 
     if (payroll) {
-      // 🔄 **Cập nhật Payroll cũ**
-      payroll.baseSalary = baseSalary;
-      payroll.actualWorkDays = actualWorkDays;
-      payroll.otHours = otHours;
-      payroll.leaveDaysPaid = leaveDaysPaid;
-      payroll.commission = commission;
-      payroll.kpiBonus = kpiBonus;
-      payroll.fine = fine;
-      payroll.department = user.department;
-      payroll.bankAccount = user.bankAccount;
-      payroll.idCardNumber = user.idCardNumber;
-      payroll.role = user.role;
-      payroll.companyEmail = user.companyEmail;
-      payroll.totalSalary = totalSalary;
-
+      // Nếu có thì cập nhật
+      payroll.set(payrollData);
       await payroll.save();
     } else {
-      // 🆕 **Tạo Payroll mới**
-      payroll = new Payroll({
-        employeeID,
-        baseSalary,
-        actualWorkDays,
-        otHours,
-        leaveDaysPaid,
-        commission,
-        kpiBonus,
-        fine,
-        department: user.department,
-        bankAccount: user.bankAccount,
-        idCardNumber: user.idCardNumber,
-        role: user.role,
-        companyEmail: user.companyEmail,
-        totalSalary,
-        month: payrollMonth,
-        year: payrollYear,
-      });
-
+      // Nếu chưa thì tạo mới
+      payroll = new Payroll(payrollData);
       await payroll.save();
     }
 
-    // ✅ Trả về totalSalary trong response
-    res.json({
-      success: true,
-      message: payroll ? "Cập nhật lương thành công" : "Tính lương thành công",
-      payroll,
-      totalSalary,
-    });
+    res.status(201).json(payroll);
+    sendNotification(
+      employeeID,
+      "Payroll Notification",
+      `Lương tháng ${month}/${year} đã có: ${calculated.netSalary.toLocaleString()} VND`
+    );
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Lỗi tính lương",
-      error: error.message,
-    });
+    console.error("Payroll error:", error);
+    res.status(500).json({ error: error.message });
   }
 };
 
-module.exports = { calculatePayroll };
+// READ all
+const getAllPayrolls = async (req, res) => {
+  try {
+    const data = await Payroll.find();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// READ by ID
+const getPayrollById = async (req, res) => {
+  try {
+    const payroll = await Payroll.findById(req.params.id);
+    if (!payroll) return res.status(404).json({ message: "Not found" });
+    res.json(payroll);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// UPDATE
+const updatePayroll = async (req, res) => {
+  try {
+    const calculated = calculatePayroll(req.body);
+    const updated = await Payroll.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body, ...calculated },
+      { new: true }
+    );
+    if (!updated) return res.status(404).json({ message: "Not found" });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// DELETE
+const deletePayroll = async (req, res) => {
+  try {
+    const deleted = await Payroll.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ message: "Not found" });
+    res.json({ message: "Deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+module.exports = {
+  createPayroll,
+  getAllPayrolls,
+  getPayrollById,
+  updatePayroll,
+  deletePayroll,
+};

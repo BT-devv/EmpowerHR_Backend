@@ -8,6 +8,9 @@ const role = require("./roleRoutes.js");
 const permission = require("./permissionRoutes.js");
 const files = require("./fileRoutes");
 const upload = require("./uploadFileRoutes.js");
+const department = require("./departmentRoutes.js");
+const jobtitle = require("./jobtitleRoutes.js");
+const holiday = require("./holidayRoutes.js");
 
 const router = express.Router();
 
@@ -21,5 +24,8 @@ router.use("/role", role);
 router.use("/permission", permission);
 router.use("/file", files);
 router.use("/upload", upload);
+router.use("/department", department);
+router.use("/jobtitle", jobtitle);
+router.use("/holiday", holiday);
 
 module.exports = router;

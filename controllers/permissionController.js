@@ -1,5 +1,5 @@
 const Role = require("../models/Role");
-const Permission = require("../models/permission");
+const Permission = require("../models/Permission");
 
 // Create
 const createPermission = async (req, res) => {
@@ -36,17 +36,41 @@ const getPermission = async (req, res) => {
 const assignPermission = async (req, res) => {
   try {
     const { roleId, permissionId } = req.body;
+
+    // Kiểm tra đầu vào
+    if (!roleId || !permissionId) {
+      return res
+        .status(400)
+        .json({ message: "Missing roleId or permissionId" });
+    }
+
     const role = await Role.findById(roleId);
     if (!role) return res.status(404).json({ message: "Role not found" });
 
+    // Đảm bảo role.permissions là một mảng
+    if (!role.permissions) role.permissions = [];
+
+    // Kiểm tra trùng lặp
+    const isAlreadyAssigned = role.permissions.includes(permissionId);
+    if (isAlreadyAssigned) {
+      return res
+        .status(400)
+        .json({ message: "Permission already assigned to this role" });
+    }
+
+    // Thêm permission mới
     role.permissions.push(permissionId);
     await role.save();
 
     res.status(200).json({ message: "Permission assigned successfully", role });
   } catch (error) {
-    res.status(500).json({ message: "Error assigning permission", error });
+    console.error(error);
+    res
+      .status(500)
+      .json({ message: "Error assigning permission", error: error.message });
   }
 };
+
 module.exports = {
   createPermission,
   getPermission,

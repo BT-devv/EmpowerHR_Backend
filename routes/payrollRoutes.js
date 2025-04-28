@@ -1,7 +1,17 @@
 const express = require("express");
 const router = express.Router();
-const { calculatePayroll } = require("../controllers/payrollController");
+const {
+  createPayroll,
+  getAllPayrolls,
+  getPayrollById,
+  updatePayroll,
+  deletePayroll,
+} = require("../controllers/payrollController");
 
-router.post("/calculate", calculatePayroll); // Create User
+router.post("/", createPayroll);
+router.get("/", getAllPayrolls);
+router.get("/:id", getPayrollById);
+router.put("/:id", updatePayroll);
+router.delete("/:id", deletePayroll);
 
 module.exports = router;

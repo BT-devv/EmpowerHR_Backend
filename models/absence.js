@@ -12,7 +12,7 @@ const absenceSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["Full Day", "Half Day", "Leave Desk"],
+    enum: ["Full Day", "Half Day", "Leave Desk", "Remote"],
     required: true,
   },
   dateFrom: {
@@ -67,10 +67,8 @@ const absenceSchema = new mongoose.Schema({
     type: Date,
     default: () => moment().tz("Asia/Ho_Chi_Minh").toDate(),
   },
-  remainingDays: {
-    type: Number,
-    default: 0,
-  },
+  payLeaveDays: { type: Number, default: 0 }, // số ngày được nghỉ có phép
+  unpaidLeaveDays: { type: Number, default: 0 }, // số ngày nghỉ không phép
 });
 
 module.exports = mongoose.model("Absence", absenceSchema);
