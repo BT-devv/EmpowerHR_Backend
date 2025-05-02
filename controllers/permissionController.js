@@ -70,10 +70,49 @@ const assignPermission = async (req, res) => {
       .json({ message: "Error assigning permission", error: error.message });
   }
 };
+// Unassign Permission from Role
+const unassignPermission = async (req, res) => {
+  try {
+    const { roleId, permissionId } = req.body;
+
+    // Kiểm tra đầu vào
+    if (!roleId || !permissionId) {
+      return res
+        .status(400)
+        .json({ message: "Missing roleId or permissionId" });
+    }
+
+    const role = await Role.findById(roleId);
+    if (!role) {
+      return res.status(404).json({ message: "Role not found" });
+    }
+
+    // Kiểm tra xem permission có tồn tại trong role không
+    const index = role.permissions.indexOf(permissionId);
+    if (index === -1) {
+      return res
+        .status(400)
+        .json({ message: "Permission not assigned to this role" });
+    }
+
+    // Xoá permission khỏi role
+    role.permissions.splice(index, 1);
+    await role.save();
+
+    res
+      .status(200)
+      .json({ message: "Permission unassigned successfully", role });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error unassigning permission", error: error.message });
+  }
+};
 
 module.exports = {
   createPermission,
   getPermission,
   assignPermission,
   deletePermission,
+  unassignPermission,
 };

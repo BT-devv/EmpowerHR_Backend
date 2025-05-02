@@ -13,8 +13,8 @@ const attendanceSchema = new mongoose.Schema({
   checkOut: { type: String }, // "HH:mm"
   status: {
     type: String,
-    enum: ["absent", "Work from office", "late"],
-    default: "absent",
+    enum: ["pending", "absent", "Work from office", "late"],
+    default: "pending",
   },
   breakingHours: { type: String, default: "1h" }, // Mặc định nghỉ trưa 1h
   workingHours: { type: String, default: "0m" },

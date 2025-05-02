@@ -56,6 +56,7 @@ const login = async (req, res) => {
         role: user.role,
         lastName: user.lastName,
         firstName: user.firstName,
+        avatar: user.avatar,
       },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
@@ -72,6 +73,7 @@ const login = async (req, res) => {
       role: user.role,
       lastName: user.lastName,
       firstName: user.firstName,
+      avatar: user.avatar,
     });
   } catch (error) {
     console.error("Error Login:", error.message);

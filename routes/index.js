@@ -11,6 +11,8 @@ const upload = require("./uploadFileRoutes.js");
 const department = require("./departmentRoutes.js");
 const jobtitle = require("./jobtitleRoutes.js");
 const holiday = require("./holidayRoutes.js");
+const basesalary = require("./baseSalaryRoutes.js");
+const dependent = require("./dependentRoutes.js");
 
 const router = express.Router();
 
@@ -27,5 +29,7 @@ router.use("/upload", upload);
 router.use("/department", department);
 router.use("/jobtitle", jobtitle);
 router.use("/holiday", holiday);
+router.use("/base-salary", basesalary);
+router.use("/dependent", dependent);
 
 module.exports = router;
