@@ -27,10 +27,15 @@ const sendEmail = async (to, subject, text) => {
 };
 // gửi yêu cầu nghỉ phép
 const requestAbsence = async (req, res) => {
-  const { type, dateFrom, dateTo, lineManagers, reason, isPaidLeave } =
+  const { type, dateFrom, dateTo, lineManagers, reason, isPaidLeave, session } =
     req.body;
   const employeeID = req.user.employeeID;
-
+  if (type === "Half Day" && !session) {
+    return res.status(400).json({
+      success: false,
+      message: "Vui lòng chọn buổi (sáng hoặc chiều) cho Half Day.",
+    });
+  }
   try {
     const employee = await User.findOne({ employeeID });
     if (!employee) {
