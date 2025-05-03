@@ -2,7 +2,29 @@ const Absence = require("../models/Absence");
 const User = require("../models/User");
 const moment = require("moment-timezone");
 const { sendNotification } = require("../sockets/socketManager");
-const Holiday = require("../models/Holiday"); // Nhớ import thêm Holiday
+const Holiday = require("../models/Holiday");
+const nodemailer = require("nodemailer");
+// Cấu hình SMTP để gửi email
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "lupinnguyen1811@gmail.com", // Thay bằng email của bạn
+    pass: "owdn vxar raqc vznv", // Thay bằng mật khẩu ứng dụng (App Password)
+  },
+});
+// Hàm gửi email
+const sendEmail = async (to, subject, text) => {
+  try {
+    await transporter.sendMail({
+      from: "lupinnguyen1811@gmail.com",
+      to,
+      subject,
+      text,
+    });
+  } catch (error) {
+    console.error("Email sending error:", error);
+  }
+};
 // gửi yêu cầu nghỉ phép
 const requestAbsence = async (req, res) => {
   const { type, dateFrom, dateTo, lineManagers, reason, isPaidLeave } =
@@ -155,6 +177,13 @@ const requestAbsence = async (req, res) => {
         `Có yêu cầu nghỉ phép mới từ ${employee.firstName} ${employee.lastName}.`
       );
     });
+
+    // Gửi email cho Manager
+    await sendEmail(
+      manager.emailCompany,
+      "New Absence Request",
+      `You have a new absence request from ${employee.firstName} ${employee.lastName}.\n\nType: ${type}\nDate: ${date}\nReason: ${reason}`
+    );
     res.status(201).json({
       success: true,
       message: "Đã gửi yêu cầu nghỉ!",
@@ -221,6 +250,12 @@ const approveAbsence = async (req, res) => {
       `Đơn nghỉ phép của bạn đã được ${
         status === "Approved" ? "duyệt" : "từ chối"
       }.`
+    );
+    // Gửi email cho nhân viên
+    await sendEmail(
+      employee.emailCompany,
+      "Absence Request Update",
+      `Your absence request has been ${status.toLowerCase()} by your manager.`
     );
     res.status(200).json({
       success: true,

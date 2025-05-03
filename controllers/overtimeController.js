@@ -3,7 +3,30 @@ const User = require("../models/User");
 const Holiday = require("../models/Holiday");
 const { sendNotification } = require("../sockets/socketManager");
 const moment = require("moment-timezone");
+const nodemailer = require("nodemailer");
 
+// Cấu hình SMTP để gửi email
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "lupinnguyen1811@gmail.com", // Thay bằng email của bạn
+    pass: "owdn vxar raqc vznv", // Thay bằng mật khẩu ứng dụng (App Password)
+  },
+});
+
+// Hàm gửi email
+const sendEmail = async (to, subject, text) => {
+  try {
+    await transporter.sendMail({
+      from: "lupinnguyen1811@gmail.com",
+      to,
+      subject,
+      text,
+    });
+  } catch (error) {
+    console.error("Email sending error:", error);
+  }
+};
 //Nhân viên gửi request OT
 const requestOvertime = async (req, res) => {
   try {
@@ -155,6 +178,12 @@ const requestOvertime = async (req, res) => {
       "Overtime Request",
       `Yêu cầu OT mới từ ${user.firstName} ${user.lastName} đang chờ duyệt`
     );
+    // Gửi email cho manager (dùng emailCompany)
+    await sendEmail(
+      manager.emailCompany,
+      "New Overtime Request",
+      `You have a new overtime request from ${user.firstName} ${user.lastName}.\n\nStart Time: ${startTime}\nEnd Time: ${endTime}\nReason: ${reason}`
+    );
   } catch (error) {
     console.error("Lỗi khi gửi yêu cầu OT:", error);
     res.status(500).json({
@@ -229,6 +258,12 @@ const updateOvertimeStatus = async (req, res) => {
       `Yêu cầu OT của bạn đã được ${status.toLowerCase()}${
         status === "Rejected" ? ` - Lý do: ${rejectReason}` : ""
       }`
+    );
+    // Gửi email cho nhân viên (dùng emailCompany)
+    await sendEmail(
+      employee.emailCompany,
+      "Overtime Request Update",
+      `Your overtime request has been ${status.toLowerCase()} by your manager.`
     );
   } catch (error) {
     console.error("Update overtime error:", error);

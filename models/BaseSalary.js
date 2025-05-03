@@ -11,4 +11,4 @@ const baseSalarySchema = new mongoose.Schema({
   amount: { type: Number, required: true },
 });
 
-module.exports = mongoose.model("baseSalary", baseSalarySchema);
+module.exports = mongoose.model("BaseSalary", baseSalarySchema); // tên model là "BaseSalary"
