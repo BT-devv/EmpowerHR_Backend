@@ -44,6 +44,13 @@ const absenceSchema = new mongoose.Schema({
     enum: ["Pending", "Approved", "Rejected"],
     default: "Pending",
   },
+  session: {
+    type: String,
+    enum: ["Morning", "Afternoon"],
+    required: function () {
+      return this.type === "Half Day";
+    },
+  },
   managerID: {
     type: String,
   },
