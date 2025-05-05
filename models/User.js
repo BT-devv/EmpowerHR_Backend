@@ -104,13 +104,11 @@ const userSchema = new mongoose.Schema({
     enum: ["Fulltime", "Partime", "Collab", "Intern"],
   },
   department: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Department",
     required: true,
   },
-  jobTitle: {
-    type: String,
-    required: true,
-  },
+  jobtitle: { type: mongoose.Schema.Types.ObjectId, ref: "Jobtitle" },
   role: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Role",

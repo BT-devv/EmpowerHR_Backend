@@ -11,6 +11,7 @@ const { checkIn, checkOut } = require("./attendanceController");
 const { use } = require("../routes/absenceRoutes");
 const { text } = require("body-parser");
 const otpStore = new Map(); // Lưu OTP tạm thời
+const { sendNotification } = require("../sockets/socketManager");
 const BlacklistedToken = require("../models/blacklistedToken");
 
 const login = async (req, res) => {
@@ -107,8 +108,6 @@ const logout = async (req, res) => {
     });
   }
 };
-
-module.exports = logout;
 
 const forgotPassword = async (req, res) => {
   const { emailCompany } = req.body;
@@ -289,7 +288,7 @@ const createUser = async (req, res) => {
     phoneNumber,
     emailCompany,
     emailPersonal,
-    password, // Mật khẩu đã được mã hóa trước
+    password, // Mật khẩu đã được mã hóa trước hoặc null để tạo ngẫu nhiên
     address,
     province,
     city,
@@ -297,22 +296,23 @@ const createUser = async (req, res) => {
     bankName,
     bankAccountNumber,
     bankAccountName,
-    department,
-    jobTitle,
+    department, // ID từ client
+    jobTitle, // ID từ client
     employeeType,
     role: roleName,
     joiningDate,
     endDate,
     status,
   } = req.body;
-  // Tìm role theo tên
-  const roleDoc = await Role.findOne({ name: roleName });
-  if (!roleDoc) {
-    return res.status(400).json({ message: "Vai trò không tồn tại!" });
-  }
-  try {
-    console.log("📧 Debug: emailCompany nhận được:", emailCompany);
 
+  try {
+    // Tìm role theo tên
+    const roleDoc = await Role.findOne({ name: roleName });
+    if (!roleDoc) {
+      return res.status(400).json({ message: "Vai trò không tồn tại!" });
+    }
+
+    // Kiểm tra email công ty đã tồn tại chưa
     const existingUser = await User.findOne({ emailCompany });
     if (existingUser) {
       return res.status(400).json({
@@ -321,10 +321,10 @@ const createUser = async (req, res) => {
       });
     }
 
-    // Nếu không có mật khẩu, tạo mật khẩu ngẫu nhiên
+    // Nếu không có mật khẩu thì tạo mật khẩu ngẫu nhiên
     const userPassword = password || generatePassword();
 
-    // Tạo user mới
+    // Tạo người dùng mới
     const newUser = new User({
       firstName,
       lastName,
@@ -335,7 +335,7 @@ const createUser = async (req, res) => {
       phoneNumber,
       emailCompany,
       emailPersonal,
-      password: userPassword, // Giữ nguyên mật khẩu đã được mã hóa
+      password: userPassword,
       address,
       province,
       city,
@@ -343,8 +343,8 @@ const createUser = async (req, res) => {
       bankName,
       bankAccountNumber,
       bankAccountName,
-      department,
-      jobTitle,
+      department, // là ObjectId
+      jobtitle: jobTitle, // lưu đúng theo schema là `jobtitle`
       employeeType,
       role: roleDoc._id,
       joiningDate,
@@ -354,38 +354,37 @@ const createUser = async (req, res) => {
 
     await newUser.save();
 
-    // Gửi email chứa mật khẩu cho người dùng
+    // Gửi email chứa thông tin đăng nhập
     await sendEmail(
       emailCompany,
       " [EmpowerHR] Thông Tin Đăng Nhập Tài Khoản Nhân Viên",
       `Kính gửi ${firstName} ${lastName},
-    
+
 Chào mừng bạn đến với hệ thống EmpowerHR! Dưới đây là thông tin đăng nhập tài khoản của bạn:
-    
+
 🔹 Tên đăng nhập (Email công ty): ${emailCompany}  
 🔹 Mật khẩu tạm thời: ${userPassword}  
-    
+
 Vui lòng đăng nhập vào hệ thống tại [link hệ thống], sau đó thay đổi mật khẩu để đảm bảo an toàn.
-    
+
 🔒 Hướng dẫn thay đổi mật khẩu:
  1️⃣ Truy cập vào [link hệ thống]  
  2️⃣ Đăng nhập bằng thông tin trên  
  3️⃣ Vào mục Tài khoản > Đổi mật khẩu 
  4️⃣ Xác nhận OTP được gửi qua email và tạo mật khẩu mới  
-    
+
 Nếu bạn gặp bất kỳ vấn đề nào, vui lòng liên hệ [email bộ phận IT] để được hỗ trợ.
-    
+
 Trân trọng,  
 Phòng Hành Chính - Nhân Sự  
 📞 [Số điện thoại hỗ trợ]  
 ✉️ [Email hỗ trợ]`
     );
 
-    console.log("Mật khẩu sử dụng:", userPassword);
     res.status(201).json({
       success: true,
       message:
-        "Tạo người dùng thành công! Mật khẩu đã được gửi về email Company",
+        "Tạo người dùng thành công! Mật khẩu đã được gửi về email công ty.",
       user: newUser,
     });
   } catch (error) {
@@ -639,7 +638,7 @@ const getQRCode = async (req, res) => {
 // API scan QR
 const scanQRCode = async (req, res) => {
   try {
-    const { qrData } = req.body; // Nhận dữ liệu từ QR Code
+    const { qrData } = req.body;
 
     if (!qrData || !qrData.EmployeeID) {
       return res.status(400).json({
@@ -649,9 +648,11 @@ const scanQRCode = async (req, res) => {
     }
 
     const employeeID = qrData.EmployeeID;
-    const today = moment().tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DD");
+    const now = moment().tz("Asia/Ho_Chi_Minh");
+    const today = now.format("YYYY-MM-DD");
+    const nowTime = now.format("HH:mm:ss");
 
-    // Kiểm tra trạng thái điểm danh hôm nay
+    // Tìm bản ghi điểm danh hôm nay
     let attendance = await Attendance.findOne({ employeeID, date: today });
 
     if (!attendance) {
@@ -662,15 +663,44 @@ const scanQRCode = async (req, res) => {
     }
 
     if (!attendance.checkIn) {
-      // Chưa check-in -> Ghi nhận check-in & đổi status
-      attendance.checkIn = moment().tz("Asia/Ho_Chi_Minh").format("HH:mm:ss");
+      // Chưa check-in
+      attendance.checkIn = nowTime;
       attendance.status = "Work from office";
       await attendance.save();
 
+      // Gửi thông báo check-in
+      const scheduledCheckIn = moment.tz(
+        `${today} 08:30:00`,
+        "YYYY-MM-DD HH:mm:ss",
+        "Asia/Ho_Chi_Minh"
+      );
+      const diffMinutes = now.diff(scheduledCheckIn, "minutes");
+      let timingMessage = "";
+
+      if (diffMinutes < 0) {
+        timingMessage = `${Math.abs(diffMinutes)}m early`;
+      } else if (diffMinutes === 0) {
+        timingMessage = `You are on time`;
+      } else {
+        timingMessage = `${diffMinutes}m late`;
+      }
+
+      const formattedDate = now.format("dddd, MMMM D - YYYY h:mm A");
+      const message = `You have successfully check-in at ${formattedDate} ${timingMessage}`;
+
+      sendNotification(employeeID, "Attendance", message);
+
       return checkIn({ body: { employeeID } }, res);
     } else {
-      // Đã check-in -> Gọi check-out
-      return checkOut({ body: { employeeID } }, res);
+      // Đã check-in, thực hiện check-out
+      const checkoutRes = await checkOut({ body: { employeeID } }, res);
+
+      // Gửi thông báo check-out
+      const formattedDate = now.format("dddd, MMMM D - YYYY h:mm A");
+      const message = `You have successfully check-out at ${formattedDate}`;
+      sendNotification(employeeID, "Attendance", message);
+
+      return checkoutRes;
     }
   } catch (error) {
     console.error("QR Scan error:", error);

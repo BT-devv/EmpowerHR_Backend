@@ -4,6 +4,8 @@ const moment = require("moment-timezone");
 const { sendNotification } = require("../sockets/socketManager");
 const Holiday = require("../models/Holiday");
 const nodemailer = require("nodemailer");
+
+const MONTHLY_LEAVE_DESK_LIMIT_HOURS = 2;
 // Cấu hình SMTP để gửi email
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -62,6 +64,14 @@ const requestAbsence = async (req, res) => {
         success: false,
         message: "Thời gian kết thúc phải sau thời gian bắt đầu.",
       });
+    }
+
+    // Kiểm tra quota Leave Desk trước khi tiếp tục
+    const leaveDeskCheck = await checkLeaveDeskQuota(req, res);
+    if (!leaveDeskCheck.success) {
+      return res
+        .status(leaveDeskCheck.success ? 200 : 400)
+        .json(leaveDeskCheck);
     }
   }
 
@@ -376,7 +386,85 @@ const getAbsencesHistory = async (req, res) => {
     });
   }
 };
+const checkLeaveDeskQuota = async (req, res) => {
+  const employeeID = req.user.employeeID;
+  const { leaveFromTime, leaveToTime } = req.body;
 
+  if (!leaveFromTime || !leaveToTime) {
+    return res.status(400).json({
+      success: false,
+      message: "Thiếu thời gian bắt đầu hoặc kết thúc.",
+    });
+  }
+
+  const from = moment(leaveFromTime);
+  const to = moment(leaveToTime);
+  const requestedMinutes = to.diff(from, "minutes");
+
+  if (requestedMinutes <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Thời gian kết thúc phải sau thời gian bắt đầu.",
+    });
+  }
+
+  const requestedHours = requestedMinutes / 60;
+
+  const startOfMonth = moment().startOf("month").toDate();
+  const endOfMonth = moment().endOf("month").toDate();
+
+  try {
+    // Tính tổng số giờ Leave Desk đã dùng trong tháng này
+    const leaveDeskAbsences = await Absence.find({
+      employeeID,
+      type: "Leave Desk",
+      status: "Approved", // Chỉ tính đơn đã được duyệt
+      leaveFromTime: { $gte: startOfMonth, $lte: endOfMonth },
+    });
+
+    const usedHours = leaveDeskAbsences.reduce(
+      (sum, absence) => sum + (absence.totalLeaveDeskHours || 0),
+      0
+    );
+
+    const remainingHours = MONTHLY_LEAVE_DESK_LIMIT_HOURS - usedHours;
+
+    if (remainingHours <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Bạn đã sử dụng hết ${MONTHLY_LEAVE_DESK_LIMIT_HOURS} giờ nghỉ Leave Desk trong tháng.`,
+      });
+    }
+
+    if (requestedHours > remainingHours) {
+      return res.status(200).json({
+        success: true,
+        warning: true,
+        message: `Bạn chỉ còn ${remainingHours.toFixed(
+          2
+        )} giờ Leave Desk trong tháng, nhưng bạn đang yêu cầu ${requestedHours.toFixed(
+          2
+        )} giờ.`,
+        remainingHours,
+        requestedHours,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Bạn có thể gửi yêu cầu nghỉ Leave Desk.",
+      remainingHours,
+      requestedHours,
+    });
+  } catch (error) {
+    console.error("Lỗi kiểm tra quota Leave Desk:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Lỗi hệ thống.",
+      error: error.message,
+    });
+  }
+};
 module.exports = {
   requestAbsence,
   approveAbsence,
