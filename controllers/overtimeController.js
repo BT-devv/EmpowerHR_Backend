@@ -178,6 +178,14 @@ const requestOvertime = async (req, res) => {
       "Overtime Request",
       `Yêu cầu OT mới từ ${user.firstName} ${user.lastName} đang chờ duyệt`
     );
+    const manager = await User.findOne({ employeeID: projectManager });
+    if (!manager) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy thông tin người quản lý.",
+      });
+    }
+
     // Gửi email cho manager (dùng emailCompany)
     await sendEmail(
       manager.emailCompany,
@@ -259,6 +267,14 @@ const updateOvertimeStatus = async (req, res) => {
         status === "Rejected" ? ` - Lý do: ${rejectReason}` : ""
       }`
     );
+    const employee = await User.findOne({ employeeID: overtime.employeeID });
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy thông tin nhân viên.",
+      });
+    }
+
     // Gửi email cho nhân viên (dùng emailCompany)
     await sendEmail(
       employee.emailCompany,
