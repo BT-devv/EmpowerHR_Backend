@@ -66,6 +66,23 @@ const absenceSchema = new mongoose.Schema({
         "Lý do từ chối (rejectReason) là bắt buộc nếu trạng thái là 'Rejected'.",
     },
   },
+  // Thêm thời gian rời bàn
+  leaveFromTime: {
+    type: Date,
+    required: function () {
+      return this.type === "Leave Desk";
+    },
+  },
+  leaveToTime: {
+    type: Date,
+    required: function () {
+      return this.type === "Leave Desk";
+    },
+  },
+  totalLeaveDeskHours: {
+    type: Number,
+    default: 0,
+  },
   createdAt: {
     type: Date,
     default: () => moment().tz("Asia/Ho_Chi_Minh").toDate(),
