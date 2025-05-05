@@ -176,7 +176,6 @@ const getAttendanceSummary = async (req, res) => {
   try {
     const { employeeID, startDate, endDate } = req.query;
 
-    // Lọc theo employeeID và khoảng thời gian (nếu có)
     let filter = { employeeID };
     if (startDate && endDate) {
       filter.date = {
@@ -185,10 +184,8 @@ const getAttendanceSummary = async (req, res) => {
       };
     }
 
-    // Truy vấn attendance trong khoảng thời gian và cho nhân viên
     const attendances = await Attendance.find(filter);
 
-    // Tổng hợp số lần đi đúng giờ, đi trễ và vắng mặt
     let onTimeCount = 0;
     let lateCount = 0;
     let absentCount = 0;
@@ -203,10 +200,13 @@ const getAttendanceSummary = async (req, res) => {
       }
     });
 
+    const total = attendances.length;
+
     res.status(200).json({
       success: true,
       message: "Attendance summary retrieved successfully",
       data: {
+        total,
         onTimeCount,
         lateCount,
         absentCount,
