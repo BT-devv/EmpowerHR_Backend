@@ -4,7 +4,7 @@ const OvertimeSchema = new mongoose.Schema({
   employeeID: { type: String, required: true },
   name: { type: String, required: true },
   projectManager: { type: String, required: true },
-  date: { type: String, required: true }, // YYYY-MM-DD
+  date: { type: Date, default: () => moment().tz("Asia/Ho_Chi_Minh").toDate() }, // YYYY-MM-DD
   startTime: { type: String, required: true }, // HH:mm
   endTime: { type: String, required: true }, // HH:mm
   duration: { type: Number, required: true }, // Số giờ OT
