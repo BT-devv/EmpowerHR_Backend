@@ -3,35 +3,40 @@ const Attendance = require("../models/Attendance");
 const Absence = require("../models/Absence");
 const Overtime = require("../models/Overtime");
 const Payroll = require("../models/Payroll");
+const BaseSalary = require("../models/BaseSalary");
+const Dependent = require("../models/Dependent");
 const { sendNotification } = require("../sockets/socketManager");
 const nodemailer = require("nodemailer");
 const moment = require("moment");
 
 // Helper tính các khoản
-const calculatePayroll = async (req, res) => {
+const calculatePayroll = async ({
+  employeeID,
+  month,
+  year,
+  bonus = 0,
+  salaryAdvance = 0,
+  salarySubtraction = 0,
+}) => {
   try {
-    const { employeeID, month, year } = req.body;
-
+    // Lấy thông tin người dùng
     const user = await User.findOne({ employeeID });
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Nhân viên không tồn tại." });
+      throw new Error("Nhân viên không tồn tại.");
     }
 
     const baseSalary = user.salary || 0;
-
     const startOfMonth = moment
       .tz(`${year}-${month}-01`, "Asia/Ho_Chi_Minh")
       .startOf("month");
     const endOfMonth = startOfMonth.clone().endOf("month");
 
-    // ===== Đếm totalWorkingDays từ bảng Attendance =====
+    // ===== Đếm tổng số ngày làm việc từ Attendance =====
     const totalWorkingDays = await Attendance.countDocuments({
       date: { $gte: startOfMonth.toDate(), $lte: endOfMonth.toDate() },
     });
 
-    // ===== Đếm employeeWorkingDays của nhân viên (không absent) =====
+    // ===== Đếm số ngày làm việc của nhân viên (không có vắng mặt) =====
     const employeeWorkingDays = await Attendance.countDocuments({
       employeeID,
       date: { $gte: startOfMonth.toDate(), $lte: endOfMonth.toDate() },
@@ -115,40 +120,21 @@ const calculatePayroll = async (req, res) => {
     const netSalary =
       grossSalary - insuranceDeduction - Math.max(personalIncomeTax, 0);
 
-    res.json({
-      success: true,
-      data: {
-        employeeID,
-        name: `${user.firstName} ${user.lastName}`,
-        baseSalary,
-        totalWorkingDays,
-        employeeWorkingDays,
-        unpaidLeaveDays,
-        salaryAfterLeave,
-        otAmount,
-        grossSalary,
-        insuranceDeduction,
-        personalIncomeTax: Math.max(personalIncomeTax, 0),
-        netSalary,
-        details: {
-          otHours: {
-            weekday: otHoursWeekday,
-            weekend: otHoursWeekend,
-            holiday: otHoursHoliday,
-          },
-          familyDeduction,
-        },
-      },
-    });
+    return {
+      salaryAfterLeave,
+      otAmount,
+      grossSalary,
+      insuranceDeduction,
+      personalIncomeTax: Math.max(personalIncomeTax, 0),
+      netSalary,
+      totalIncome: grossSalary - salaryAdvance - salarySubtraction,
+    };
   } catch (error) {
-    console.error("Lỗi khi tính lương:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Lỗi hệ thống.", error: error.message });
+    throw new Error(error.message);
   }
 };
 
-// CREATE
+// CREATE Payroll
 const createPayroll = async (req, res) => {
   try {
     const {
@@ -160,97 +146,128 @@ const createPayroll = async (req, res) => {
       year,
     } = req.body;
 
-    const startDate = moment({ year: year, month: month - 1, day: 1 });
-    const endDate = moment(startDate).endOf("month");
+    // ===== 1. Xác định ngày đầu và ngày cuối của tháng =====
+    // Dùng object để tránh cảnh báo deprecation của moment
+    const startOfMonth = moment
+      .tz({ year, month: month - 1, day: 1 }, "Asia/Ho_Chi_Minh")
+      .startOf("day");
+    const endOfMonth = startOfMonth.clone().endOf("month").endOf("day");
 
-    // Lấy thông tin nhân viên
+    // ===== 2. Lấy thông tin nhân viên =====
     const user = await User.findOne({ employeeID }).populate(
       "department jobtitle"
     );
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
     const employeeName = `${user.firstName} ${user.lastName}`;
     const position = user.position || "";
+    const department = user.department;
+    const jobtitle = user.jobtitle;
 
-    // Tự động lấy lương cơ bản từ bảng BaseSalary
+    // ===== 3. Lấy lương cơ bản =====
     const baseSalaryDoc = await BaseSalary.findOne({
-      department: user.department._id,
-      jobtitle: user.jobtitle._id,
+      department: department._id,
+      jobtitle: jobtitle._id,
     });
-
     if (!baseSalaryDoc) {
       return res.status(400).json({
         error: "Base salary not found for this department and job title.",
       });
     }
-
     const baseSalary = baseSalaryDoc.amount;
 
-    // Tính giờ làm thêm
-    const overtimeDocs = await Overtime.find({
+    // ===== 4. Tính tổng ngày làm việc trong tháng =====
+    // (dựa vào số bản ghi Attendance bất kể employeeID)
+    const totalWorkingDays = await Attendance.countDocuments({
+      date: { $gte: startOfMonth.toDate(), $lte: endOfMonth.toDate() },
+    });
+
+    // ===== 5. Tính số ngày nhân viên thực sự có mặt (không bị absent) =====
+    const employeeWorkingDays = await Attendance.countDocuments({
+      employeeID,
+      date: { $gte: startOfMonth.toDate(), $lte: endOfMonth.toDate() },
+      status: { $ne: "absent" },
+    });
+
+    const unpaidLeaveDays = totalWorkingDays - employeeWorkingDays;
+
+    // ===== 6. Lấy OT đã duyệt trong tháng =====
+    const approvedOTs = await Overtime.find({
       employeeID,
       status: "Approved",
-      date: { $gte: startDate.toDate(), $lte: endDate.toDate() },
+      date: { $gte: startOfMonth.toDate(), $lte: endOfMonth.toDate() },
+    });
+    let otHoursWeekday = 0,
+      otHoursWeekend = 0,
+      otHoursHoliday = 0;
+    approvedOTs.forEach((ot) => {
+      if (ot.workingDayType === "weekday") otHoursWeekday += ot.duration;
+      if (ot.workingDayType === "weekend") otHoursWeekend += ot.duration;
+      if (ot.workingDayType === "holiday") otHoursHoliday += ot.duration;
     });
 
-    const overtimeHours = overtimeDocs.reduce(
-      (total, ot) => total + (ot.duration || 0),
-      0
-    );
+    // ===== 7. Tính OT amount =====
+    const otRate = baseSalary / (totalWorkingDays * 8);
+    const otAmount =
+      otHoursWeekday * otRate * 1.5 +
+      otHoursWeekend * otRate * 2.0 +
+      otHoursHoliday * otRate * 3.0;
 
-    // Nghỉ có lý do (được bù công)
-    const absenceDocs = await Absence.find({
-      employeeID,
-      status: "Approved",
-      date: { $gte: startDate.toDate(), $lte: endDate.toDate() },
-    });
+    // ===== 8. Tính lương sau nghỉ và tổng thu nhập trước thuế =====
+    const perDaySalary = baseSalary / totalWorkingDays;
+    const salaryAfterLeave = perDaySalary * employeeWorkingDays;
+    const grossSalary = salaryAfterLeave + otAmount;
 
-    const compensatedHours = absenceDocs.reduce((total, ab) => {
-      if (["fullday", "remote"].includes(ab.type)) return total + 8;
-      if (ab.type === "halfday") return total + 4;
-      return total;
-    }, 0);
+    // ===== 9. Khấu trừ bảo hiểm (10.5%) =====
+    const insuranceDeduction = grossSalary * 0.105;
 
-    // Tổng giờ làm thực tế
-    const attendanceDocs = await Attendance.find({
-      employeeID,
-      date: { $gte: startDate.toDate(), $lte: endDate.toDate() },
-    });
+    // ===== 10. Tính thu nhập chịu thuế =====
+    const taxableIncome = grossSalary - insuranceDeduction;
 
-    const workedHours = attendanceDocs.reduce(
-      (total, att) => total + (att.workingHours || 0),
-      0
-    );
-
-    const totalExpectedHours = 26 * 8;
-    const actualWorkedHours = workedHours + compensatedHours;
-    const missingHours = Math.max(0, totalExpectedHours - actualWorkedHours);
-    const unpaidLeaveDays = isNaN(missingHours) ? 0 : missingHours / 8;
-
-    // Lấy số người phụ thuộc từ bảng Dependent
+    // ===== 11. Lấy số người phụ thuộc và giảm trừ gia cảnh =====
     const dependentData = await Dependent.findOne({ employeeID });
-    const numberOfDependents = dependentData
-      ? dependentData.numberOfDependents
-      : 0;
+    const numberOfDependents = dependentData?.numberOfDependents || 0;
+    const personalAllowance = 11_000_000;
+    const dependentAllowance = 4_400_000;
+    const familyDeduction =
+      personalAllowance + numberOfDependents * dependentAllowance;
 
-    // Tính toán lương
-    const calculated = calculatePayroll({
-      baseSalary,
-      overtimeHours,
-      bonus,
-      unpaidLeaveDays,
-      salaryAdvance,
-      salarySubtraction,
-      numberOfDependents,
-    });
+    // ===== 12. Tính thuế TNCN lũy tiến =====
+    let personalIncomeTax = 0;
+    const levels = [
+      { max: 5_000_000, rate: 0.05 },
+      { max: 10_000_000, rate: 0.1 },
+      { max: 18_000_000, rate: 0.15 },
+      { max: 32_000_000, rate: 0.2 },
+      { max: 52_000_000, rate: 0.25 },
+      { max: 80_000_000, rate: 0.3 },
+      { max: Infinity, rate: 0.35 },
+    ];
+    let remaining = taxableIncome - familyDeduction;
+    let prevMax = 0;
+    for (const lvl of levels) {
+      if (remaining <= 0) break;
+      const range = Math.min(lvl.max - prevMax, remaining);
+      personalIncomeTax += range * lvl.rate;
+      remaining -= range;
+      prevMax = lvl.max;
+    }
 
-    // Kiểm tra xem bảng lương đã tồn tại chưa
+    // ===== 13. Tính lương thực nhận và tổng còn lại =====
+    const netSalary =
+      grossSalary - insuranceDeduction - Math.max(personalIncomeTax, 0);
+    const totalIncome = grossSalary - salaryAdvance - salarySubtraction;
+
+    // ===== 14. Tạo hoặc cập nhật Payroll =====
     let payroll = await Payroll.findOne({ employeeID, month, year });
-
     const payrollData = {
       employeeID,
       employeeName,
       position,
+      department: department._id,
+      jobtitle: jobtitle._id,
       baseSalary,
       bonus,
       salaryAdvance,
@@ -259,10 +276,10 @@ const createPayroll = async (req, res) => {
       year,
       payDate: new Date(year, month - 1, 0),
       unpaidLeave: unpaidLeaveDays,
-      otPay: calculated.overtimePay,
-      personalIncomeTax: calculated.personalIncomeTax,
-      total: calculated.totalIncome,
-      netSalary: calculated.netSalary,
+      otPay: otAmount,
+      personalIncomeTax,
+      total: totalIncome,
+      netSalary,
     };
 
     if (payroll) {
@@ -273,30 +290,38 @@ const createPayroll = async (req, res) => {
       await payroll.save();
     }
 
+    // ===== 15. Trả về kết quả 1 lần duy nhất =====
     res.status(201).json(payroll);
-    await sendPayrollEmail(employeeID, {
-      month,
-      year,
-      baseSalary,
-      totalWorkingDays,
-      employeeWorkingDays,
-      unpaidLeaveDays,
-      salaryAfterLeave,
-      otAmount,
-      grossSalary,
-      insuranceDeduction,
-      personalIncomeTax,
-      netSalary,
-    });
 
-    sendNotification(
-      employeeID,
-      "Payroll Notification",
-      `Lương tháng ${month}/${year} đã có: ${calculated.netSalary.toLocaleString()} VND`
-    );
+    // Gửi email/notification (không ảnh hưởng response)
+    try {
+      await sendPayrollEmail(employeeID, {
+        month,
+        year,
+        baseSalary,
+        totalWorkingDays,
+        employeeWorkingDays,
+        unpaidLeaveDays,
+        salaryAfterLeave,
+        otAmount,
+        grossSalary,
+        insuranceDeduction,
+        personalIncomeTax,
+        netSalary,
+      });
+      sendNotification(
+        employeeID,
+        "Payroll Notification",
+        `Lương tháng ${month}/${year} đã có: ${netSalary.toLocaleString()} VND`
+      );
+    } catch (e) {
+      console.error("Error sending email/notification:", e);
+    }
   } catch (error) {
-    console.error("Payroll error:", error);
-    res.status(500).json({ error: error.message });
+    console.error("Payroll creation failed:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    }
   }
 };
 
@@ -358,8 +383,8 @@ const sendPayrollEmail = async (employeeID, payrollData) => {
     const transporter = nodemailer.createTransport({
       service: "gmail", // hoặc SMTP server của công ty bạn
       auth: {
-        user: "your_email@gmail.com", // email gửi
-        pass: "your_email_password", // password ứng dụng (app password)
+        user: "lupinnguyen1811@gmail.com", // Thay bằng email của bạn
+        pass: "owdn vxar raqc vznv", // Thay bằng mật khẩu ứng dụng (App Password)
       },
     });
 
