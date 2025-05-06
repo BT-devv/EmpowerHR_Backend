@@ -375,7 +375,9 @@ const deletePayroll = async (req, res) => {
 
 const sendPayrollEmail = async (employeeID, payrollData) => {
   try {
-    const user = await User.findOne({ employeeID });
+    const user = await User.findOne({ employeeID })
+      .populate("department")
+      .populate("jobtitle");
     if (!user || !user.emailCompany) {
       throw new Error("Không tìm thấy email của nhân viên.");
     }
@@ -399,7 +401,12 @@ const sendPayrollEmail = async (employeeID, payrollData) => {
           <tr><td><b>Employee Name</b></td><td>${user.firstName} ${
         user.lastName
       }</td></tr>
-          <tr><td><b>Position</b></td><td>${user.position || "N/A"}</td></tr>
+          <tr><td><b>Department</b></td><td>${
+            user.department?.name || "N/A"
+          }</td></tr>
+          <tr><td><b>Jobtitle</b></td><td>${
+            user.jobtitle?.name || "N/A"
+          }</td></tr>
         </table>
 
         <h3>Time Working</h3>

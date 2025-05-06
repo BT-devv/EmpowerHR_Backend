@@ -16,6 +16,9 @@ mongoose
 const createDailyAttendanceRecords = () => {
   cron.schedule("1 0 * * *", async () => {
     // Chạy cron job lúc 00:01 mỗi ngày
+    //chạy cron job lúc 00:01 sáng mỗi ngày
+    //cron.schedule("* * * * *", async () => {
+    //chạy mỗi phút
     console.log("🔄 Đang chạy cron job...");
 
     const today = moment().tz("Asia/Ho_Chi_Minh");
@@ -61,7 +64,19 @@ const createDailyAttendanceRecords = () => {
         if (today.date() === 1 && emp.remainingDays < 6) {
           emp.remainingDays = Math.min(emp.remainingDays + 1, 6);
         }
+        //test mỗi 10 phút reset về giá trị 0
+        /*if (today.minute() % 1 === 0) {
+          emp.remainingDays = 0;
+          console.log(`♻️ Reset remainingDays của ${emp.employeeID} về 0`);
+        }
 
+        // Cộng thêm 1 ngày nghỉ nếu nhỏ hơn 6 mỗi phút
+        if (emp.remainingDays < 6) {
+          emp.remainingDays = Math.min(emp.remainingDays + 1, 6);
+          console.log(
+            `➕ Tăng remainingDays cho ${emp.employeeID} lên ${emp.remainingDays}`
+          );
+        }*/
         await emp.save();
         // 👉 Kiểm tra xem hôm nay nhân viên này có absence approved không
         const hasApprovedAbsence = await Absence.findOne({
