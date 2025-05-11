@@ -36,19 +36,6 @@ const createDailyAttendanceRecords = () => {
     }
 
     try {
-      // Kiểm tra có phải ngày lễ không
-      const isHoliday = await Holiday.findOne({
-        startDate: { $lte: today.toDate() },
-        endDate: { $gte: today.toDate() },
-      });
-
-      if (isHoliday) {
-        console.log(
-          `🚫 Hôm nay (${todayStr}) là ngày lễ: ${isHoliday.name}. Không chạy cron job.`
-        );
-        return;
-      }
-
       console.log(`🔄 Đang cập nhật chấm công cho ngày ${todayStr}...`);
 
       // Lấy danh sách nhân viên
@@ -93,7 +80,7 @@ const createDailyAttendanceRecords = () => {
           {
             $setOnInsert: {
               name: `${emp.firstName} ${emp.lastName}`,
-              status: "absent",
+              status: "pending",
               workingHours: "0m",
               timeOff: "8h",
             },

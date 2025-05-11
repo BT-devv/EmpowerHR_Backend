@@ -150,11 +150,40 @@ function formatMinutesToTime(minutes) {
 
 const getListAttendances = async (req, res) => {
   try {
-    const { employeeID, date } = req.query;
+    const { employeeID, date, month, year, status, department, jobTitle } =
+      req.query;
 
     let filter = {};
+
     if (employeeID) filter.employeeID = employeeID;
-    if (date) filter.date = date;
+
+    if (date) {
+      filter.date = date;
+    } else if (month && year) {
+      const startDate = moment(`${year}-${month}-01`)
+        .startOf("month")
+        .format("YYYY-MM-DD");
+      const endDate = moment(`${year}-${month}-01`)
+        .endOf("month")
+        .format("YYYY-MM-DD");
+      filter.date = { $gte: startDate, $lte: endDate };
+    }
+
+    if (status) {
+      filter.status = status;
+    }
+
+    // Lọc theo department và jobTitle từ bảng User
+    let employeeFilter = {};
+    if (department) employeeFilter.department = department;
+    if (jobTitle) employeeFilter.jobTitle = jobTitle;
+
+    let employeeIDs = null;
+    if (Object.keys(employeeFilter).length > 0) {
+      const users = await User.find(employeeFilter, "employeeID");
+      employeeIDs = users.map((u) => u.employeeID);
+      filter.employeeID = { $in: employeeIDs };
+    }
 
     const attendances = await Attendance.find(filter).sort({ date: -1 });
 
@@ -172,6 +201,7 @@ const getListAttendances = async (req, res) => {
     });
   }
 };
+
 const getAttendanceSummary = async (req, res) => {
   try {
     const { employeeID, startDate, endDate } = req.query;
@@ -221,10 +251,156 @@ const getAttendanceSummary = async (req, res) => {
     });
   }
 };
+const getAttendanceByDay = async (req, res) => {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Date is required" });
+    }
+
+    const attendances = await Attendance.find({ date });
+
+    const summary = {
+      total: attendances.length,
+      present: 0,
+      late: 0,
+      absent: 0,
+    };
+
+    attendances.forEach((att) => {
+      if (att.status === "Work from office") {
+        summary.present++;
+      } else if (att.status === "late") {
+        summary.late++;
+      } else if (att.status === "absent") {
+        summary.absent++;
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Attendance statistics for the day",
+      data: summary,
+    });
+  } catch (error) {
+    console.error("Get attendance by day error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error", error: error.message });
+  }
+};
+
+const getAttendanceByMonth = async (req, res) => {
+  try {
+    const { year, month } = req.query;
+    if (!year || !month) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Year and month are required" });
+    }
+
+    const startDate = moment
+      .tz(`${year}-${month}-01`, "Asia/Ho_Chi_Minh")
+      .startOf("month");
+    const endDate = moment(startDate).endOf("month");
+
+    const attendances = await Attendance.find({
+      date: {
+        $gte: startDate.format("YYYY-MM-DD"),
+        $lte: endDate.format("YYYY-MM-DD"),
+      },
+    });
+
+    const stats = {};
+
+    attendances.forEach((att) => {
+      if (!stats[att.employeeID]) {
+        stats[att.employeeID] = {
+          name: att.name,
+          employeeID: att.employeeID,
+          present: 0,
+          late: 0,
+          absent: 0,
+        };
+      }
+
+      if (att.status === "Work from office") stats[att.employeeID].present++;
+      else if (att.status === "late") stats[att.employeeID].late++;
+      else if (att.status === "absent") stats[att.employeeID].absent++;
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Monthly attendance statistics",
+      data: Object.values(stats),
+    });
+  } catch (error) {
+    console.error("Get attendance by month error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error", error: error.message });
+  }
+};
+
+const getEmployeeAttendanceSummary = async (req, res) => {
+  try {
+    const { employeeID, startDate, endDate } = req.query;
+
+    if (!employeeID || !startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing parameters" });
+    }
+
+    const attendances = await Attendance.find({
+      employeeID,
+      date: {
+        $gte: moment(startDate).format("YYYY-MM-DD"),
+        $lte: moment(endDate).format("YYYY-MM-DD"),
+      },
+    });
+
+    let summary = {
+      total: attendances.length,
+      present: 0,
+      late: 0,
+      absent: 0,
+      totalWorkingHours: 0,
+    };
+
+    attendances.forEach((att) => {
+      if (att.status === "Work from office") summary.present++;
+      else if (att.status === "late") summary.late++;
+      else if (att.status === "absent") summary.absent++;
+
+      summary.totalWorkingHours += parseTimeToMinutes(att.workingHours || "0m");
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Employee attendance summary",
+      data: {
+        ...summary,
+        totalWorkingHours: formatMinutesToTime(summary.totalWorkingHours),
+      },
+    });
+  } catch (error) {
+    console.error("Get employee attendance summary error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error", error: error.message });
+  }
+};
 
 module.exports = {
   checkIn,
   checkOut,
   getListAttendances,
   getAttendanceSummary,
+  getAttendanceByDay,
+  getAttendanceByMonth,
+  getEmployeeAttendanceSummary,
 };

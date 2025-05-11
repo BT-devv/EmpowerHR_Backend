@@ -218,16 +218,25 @@ const resetPassword = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find(); // Lấy toàn bộ dữ liệu trong bảng users
+    const { status, department, jobTitle } = req.query;
+
+    let filter = {};
+    if (status) filter.status = status;
+    if (department) filter.department = department;
+    if (jobTitle) filter.jobTitle = jobTitle;
+
+    const users = await User.find(filter);
+
     if (!users || users.length === 0) {
       return res.status(404).json({ message: "Không có dữ liệu người dùng" });
     }
 
-    res.status(200).json(users); // Trả về dữ liệu dạng JSON
+    res.status(200).json(users); // Trả về danh sách người dùng
   } catch (error) {
     res.status(500).json({ message: "Lỗi server", error: error.message });
   }
 };
+
 const getUserById = async (req, res) => {
   const { id } = req.params;
   try {
