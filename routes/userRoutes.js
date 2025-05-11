@@ -31,6 +31,9 @@ router.securePut("/:id", "user.update", authMiddleware, updateUser);
 router.secureDelete("/:id", "user.delete", authMiddleware, deleteUser);
 router.get("/search", searchUsers);
 router.secureGet("/users", "user.read", authMiddleware, getAllUsers);
+/*/api/users?status=inactive&department=IT&jobTitle=Engineer
+/api/users?department=HR&jobTitle=Manager
+/api/users?status=active */
 router.secureGet("/:id", "user.read", authMiddleware, getUserById);
 
 router.post("/new-employee-id", getNextEmployeeID);

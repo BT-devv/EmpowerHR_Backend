@@ -92,11 +92,9 @@ const userSchema = new mongoose.Schema({
   },
   bankAccountNumber: {
     type: String,
-    required: true,
   },
   bankAccountName: {
     type: String,
-    required: true,
   },
   employeeType: {
     type: String,
