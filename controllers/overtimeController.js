@@ -8,6 +8,9 @@ const nodemailer = require("nodemailer");
 // Cấu hình SMTP để gửi email
 const transporter = nodemailer.createTransport({
   service: "gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
   auth: {
     user: "lupinnguyen1811@gmail.com", // Thay bằng email của bạn
     pass: "owdn vxar raqc vznv", // Thay bằng mật khẩu ứng dụng (App Password)
