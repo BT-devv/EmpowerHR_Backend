@@ -32,15 +32,41 @@ const calculatePayroll = async ({
     const endOfMonth = startOfMonth.clone().endOf("month");
 
     // ===== Đếm tổng số ngày làm việc từ Attendance =====
-    const totalWorkingDays = await Attendance.countDocuments({
-      date: { $gte: startOfMonth.toDate(), $lte: endOfMonth.toDate() },
+    const holidays = await Holiday.find({
+      $or: [
+        {
+          startDate: { $lte: endOfMonth.toDate() },
+          endDate: { $gte: startOfMonth.toDate() },
+        },
+      ],
     });
+
+    const holidayDates = new Set();
+    holidays.forEach((holiday) => {
+      const current = moment(holiday.startDate);
+      const end = moment(holiday.endDate);
+      while (current.isSameOrBefore(end, "day")) {
+        holidayDates.add(current.format("YYYY-MM-DD"));
+        current.add(1, "day");
+      }
+    });
+
+    let totalWorkingDays = 0;
+    const currentDay = startOfMonth.clone();
+    while (currentDay.isSameOrBefore(endOfMonth, "day")) {
+      const dayOfWeek = currentDay.day(); // 0: CN, 1: T2, ..., 6: T7
+      const dateStr = currentDay.format("YYYY-MM-DD");
+      if (dayOfWeek >= 1 && dayOfWeek <= 5 && !holidayDates.has(dateStr)) {
+        totalWorkingDays++;
+      }
+      currentDay.add(1, "day");
+    }
 
     // ===== Đếm số ngày làm việc của nhân viên (không có vắng mặt) =====
     const employeeWorkingDays = await Attendance.countDocuments({
       employeeID,
       date: { $gte: startOfMonth.toDate(), $lte: endOfMonth.toDate() },
-      status: { $ne: "absent" },
+      status: { $in: ["Work from office", "late"] },
     });
 
     const unpaidLeaveDays = totalWorkingDays - employeeWorkingDays;
