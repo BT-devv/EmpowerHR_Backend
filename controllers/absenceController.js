@@ -284,7 +284,7 @@ const checkLeaveDeskQuota = async (employeeID, leaveFromTime, leaveToTime) => {
     const leaveDeskAbsences = await Absence.find({
       employeeID,
       type: "Leave Desk",
-      status: "Approved",
+      status: { $in: ["Approved", "Pending"] },
       leaveFromTime: { $lte: endOfMonth },
       leaveToTime: { $gte: startOfMonth },
     });
@@ -404,9 +404,9 @@ const approveAbsence = async (req, res) => {
       await sendEmail(
         employee.emailCompany,
         "Absence Request Update",
-        `Đơn nghỉ phép của bạn đã được ${
-          status === "Approved" ? "duyệt" : "từ chối"
-        } bởi quản lý.`
+        status === "Approved"
+          ? "Đơn nghỉ phép của bạn đã được duyệt bởi quản lý."
+          : `Đơn nghỉ phép của bạn đã bị từ chối bởi quản lý.\nLý do từ chối: ${rejectReason}`
       );
     }
 
