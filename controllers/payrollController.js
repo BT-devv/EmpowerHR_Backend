@@ -328,7 +328,22 @@ const createPayroll = async (req, res) => {
 // READ all
 const getAllPayrolls = async (req, res) => {
   try {
-    const data = await Payroll.find();
+    const { employeeID, month, year } = req.query;
+
+    let filter = {};
+
+    if (employeeID) {
+      filter.employeeID = employeeID;
+    }
+
+    if (month && year) {
+      const start = moment(`${year}-${month}-01`).startOf("month").toDate();
+      const end = moment(`${year}-${month}-01`).endOf("month").toDate();
+      filter.payDate = { $gte: start, $lte: end }; // assuming "payDate" is the payroll's timestamp
+    }
+
+    const data = await Payroll.find(filter).sort({ payDate: -1 });
+
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -463,6 +478,56 @@ const sendPayrollEmail = async (employeeID, payrollData) => {
     console.error("Lỗi khi gửi email lương:", error);
   }
 };
+const getPayrollSummary = async (req, res) => {
+  try {
+    const { employeeID, month, year } = req.query;
+
+    let filter = {};
+    if (employeeID) filter.employeeID = employeeID;
+    if (month) filter.month = parseInt(month);
+    if (year) filter.year = parseInt(year);
+
+    const payrolls = await Payroll.find(filter)
+      .populate("department", "name")
+      .populate("jobtitle", "name");
+
+    if (!payrolls || payrolls.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "Không tìm thấy dữ liệu lương phù hợp." });
+    }
+
+    // Tổng hợp các chỉ số tài chính
+    const totalGross = payrolls.reduce((sum, p) => sum + (p.total || 0), 0);
+    const totalNet = payrolls.reduce((sum, p) => sum + (p.netSalary || 0), 0);
+    const totalTax = payrolls.reduce(
+      (sum, p) => sum + (p.personalIncomeTax || 0),
+      0
+    );
+    const totalAdvance = payrolls.reduce(
+      (sum, p) => sum + (p.salaryAdvance || 0),
+      0
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Lấy thống kê bảng lương thành công",
+      data: {
+        records: payrolls,
+        summary: {
+          totalEmployees: payrolls.length,
+          totalGross,
+          totalNet,
+          totalTax,
+          totalAdvance,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Payroll summary error:", error);
+    res.status(500).json({ message: "Lỗi server", error: error.message });
+  }
+};
 
 module.exports = {
   createPayroll,
@@ -470,4 +535,5 @@ module.exports = {
   getPayrollById,
   updatePayroll,
   deletePayroll,
+  getPayrollSummary,
 };
