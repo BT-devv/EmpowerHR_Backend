@@ -7,6 +7,7 @@ const BaseSalary = require("../models/BaseSalary");
 const Dependent = require("../models/Dependent");
 const { sendNotification } = require("../sockets/socketManager");
 const nodemailer = require("nodemailer");
+const Holiday = require("../models/Holiday");
 const moment = require("moment");
 
 // Helper tính các khoản
@@ -31,7 +32,7 @@ const calculatePayroll = async ({
       .startOf("month");
     const endOfMonth = startOfMonth.clone().endOf("month");
 
-    // ===== Đếm tổng số ngày làm việc từ Attendance =====
+    // ===== 4. Tính tổng ngày làm việc hợp lệ (T2 - T6, không nghỉ lễ) =====
     const holidays = await Holiday.find({
       $or: [
         {
@@ -206,9 +207,36 @@ const createPayroll = async (req, res) => {
 
     // ===== 4. Tính tổng ngày làm việc trong tháng =====
     // (dựa vào số bản ghi Attendance bất kể employeeID)
-    const totalWorkingDays = await Attendance.countDocuments({
-      date: { $gte: startOfMonth.toDate(), $lte: endOfMonth.toDate() },
+    // ===== 4. Tính tổng số ngày làm việc hợp lệ (T2 - T6, không nghỉ lễ) =====
+    const holidays = await Holiday.find({
+      $or: [
+        {
+          startDate: { $lte: endOfMonth.toDate() },
+          endDate: { $gte: startOfMonth.toDate() },
+        },
+      ],
     });
+
+    const holidayDates = new Set();
+    holidays.forEach((holiday) => {
+      const current = moment(holiday.startDate);
+      const end = moment(holiday.endDate);
+      while (current.isSameOrBefore(end, "day")) {
+        holidayDates.add(current.format("YYYY-MM-DD"));
+        current.add(1, "day");
+      }
+    });
+
+    let totalWorkingDays = 0;
+    const currentDay = startOfMonth.clone();
+    while (currentDay.isSameOrBefore(endOfMonth, "day")) {
+      const dayOfWeek = currentDay.day(); // 0: CN, 1: T2, ..., 6: T7
+      const dateStr = currentDay.format("YYYY-MM-DD");
+      if (dayOfWeek >= 1 && dayOfWeek <= 5 && !holidayDates.has(dateStr)) {
+        totalWorkingDays++;
+      }
+      currentDay.add(1, "day");
+    }
 
     // ===== 5. Tính số ngày nhân viên thực sự có mặt (không bị absent) =====
     const employeeWorkingDays = await Attendance.countDocuments({
@@ -477,9 +505,7 @@ const sendPayrollEmail = async (employeeID, payrollData) => {
             (payrollData.baseSalary / payrollData.totalWorkingDays)
           ).toLocaleString()} VND</td></tr>
           <tr><td><b>Personal Income Tax</b></td><td>${payrollData.personalIncomeTax.toLocaleString()} VND</td></tr>
-          <tr><td><b>Salary Advance</b></td><td>0 VND</td></tr>
-          <tr><td><b>Salary Subtraction</b></td><td>0 VND</td></tr>
-          <tr><td><b>Others</b></td><td>0 VND</td></tr>
+
         </table>
 
         <h3>NET PAY (E - D)</h3>
